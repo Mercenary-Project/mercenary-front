@@ -1,8 +1,8 @@
+// mercenary-frontend/src/components/MatchList.tsx
 
+import React from 'react';
 
-import React, { useState, useEffect } from 'react';
-
-// 백엔드 MatchSearchResponseDto와 동일한 구조
+// 💡 [핵심] App.tsx의 Match 인터페이스와 구조를 맞춰야 에러가 안 납니다.
 interface Match {
     matchId: number;
     placeName: string;
@@ -10,64 +10,52 @@ interface Match {
     matchDate: string;
     maxPlayerCount: number;
     currentPlayerCount: number;
-    distance: number; // Redis Geo 검색 결과의 핵심
+    distance: number;
+    latitude: number;  // App.tsx와 통일
+    longitude: number; // App.tsx와 통일
 }
 
-const MatchList: React.FC = () => {
-    const [matches, setMatches] = useState<Match[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+// 💡 [핵심] 부모로부터 받을 Props 정의 (이게 없어서 오류가 났던 것)
+interface MatchListProps {
+    matches: Match[];
+    loading: boolean;
+    error: string | null;
+}
 
-    useEffect(() => {
-        // [핵심] GET /api/matches/nearby API 호출
-        const fetchMatches = async () => {
-            // 서울 강남구 기준 좌표 (테스트를 위해 하드코딩)
-            const testLatitude = 37.500000;
-            const testLongitude = 127.030000;
-            const distanceKm = 5;
+const MatchList: React.FC<MatchListProps> = ({ matches, loading, error }) => {
 
-            const url = `/api/matches/nearby?latitude=${testLatitude}&longitude=${testLongitude}&distanceKm=${distanceKm}`;
-
-            try {
-                const response = await fetch(url);
-
-                // 전역 예외 처리기가 반환하는 표준 JSON 응답을 가정
-                const jsonResponse = await response.json();
-
-                if (jsonResponse.code === 200) {
-                    setMatches(jsonResponse.data);
-                } else {
-                    // 백엔드의 GlobalExceptionHandler가 처리한 에러 메시지
-                    setError(jsonResponse.message || '매치 목록을 불러오지 못했습니다.');
-                }
-
-            } catch (err) {
-                setError('서버 연결에 실패했습니다.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchMatches();
-    }, []);
-
-    if (loading) return <div>매치 목록을 불러오는 중...</div>;
-    if (error) return <div style={{ color: 'red' }}>에러: {error}</div>;
+    if (loading) return <div style={{ textAlign: 'center', padding: '20px' }}>매치 목록을 불러오는 중...</div>;
+    if (error) return <div style={{ color: 'red', textAlign: 'center', padding: '20px' }}>에러: {error}</div>;
 
     return (
         <div>
-            <h2>🔥 내 주변 5km 매치 목록 (Redis Geo 검색)</h2>
+            <h2>🔥 내 주변 매치 목록 (텍스트 뷰)</h2>
             {matches.length === 0 ? (
-                <p>주변에 매치가 없습니다.</p>
+                <p style={{ textAlign: 'center', color: '#666' }}>주변 10km 이내에 조회된 매치가 없습니다.</p>
             ) : (
-                <ul>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
                     {matches.map((match) => (
-                        <li key={match.matchId} style={{ border: '1px solid #ccc', padding: '10px', margin: '10px 0' }}>
-                            <h3>{match.placeName} ({match.district})</h3>
-                            <p>날짜: {new Date(match.matchDate).toLocaleString()}</p>
-                            <p>인원: {match.currentPlayerCount} / {match.maxPlayerCount}</p>
-                            <p style={{ fontWeight: 'bold' }}>거리: {match.distance.toFixed(2)} km</p>
+                        <li key={match.matchId} style={{
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            padding: '15px',
+                            margin: '10px 0',
+                            backgroundColor: '#fff',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                        }}>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>
+                                {match.placeName}
+                                <span style={{ fontSize: '0.8em', color: '#666', fontWeight: 'normal', marginLeft: '10px' }}>
+                                    ({match.district})
+                                </span>
+                            </h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9em', color: '#555' }}>
+                                <span>📅 {new Date(match.matchDate).toLocaleString()}</span>
+                                <span>👥 {match.currentPlayerCount} / {match.maxPlayerCount}명</span>
+                            </div>
+                            <p style={{ fontWeight: 'bold', color: '#007bff', marginTop: '10px' }}>
+                                📍 거리: {match.distance.toFixed(2)} km
+                            </p>
                         </li>
                     ))}
                 </ul>

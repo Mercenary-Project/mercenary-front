@@ -1,25 +1,31 @@
-// mercenary-frontend/src/App.tsx
-
+// src/App.tsx
 import React from 'react';
-import MatchList from './components/MatchList';
-import MatchDetail from './components/MatchDetail';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import MainBoard from './pages/MainBoard';
+import Login from './pages/Login';
+import LoginCallback from './pages/LoginCallback';
 
 const App: React.FC = () => {
-    const TEST_MATCH_ID = 1;
+    // 로그인 여부 확인
+    const isAuthenticated = !!localStorage.getItem('accessToken');
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h1>Mercenary High - Full Stack Demo</h1>
+        <Router>
+            <Routes>
+                {/* 메인 화면 */}
+                <Route path="/" element={<MainBoard />} />
 
-            {/* 1. 매치 목록 조회 */}
-            <MatchList />
+                {/* 로그인 관련 */}
+                <Route
+                    path="/login"
+                    element={isAuthenticated ? <Navigate to="/" /> : <Login />}
+                />
+                <Route path="/login/callback" element={<LoginCallback />} />
 
-            <hr style={{ margin: '40px 0' }} />
-
-            {/* 2. 매치 신청 기능 */}
-            <MatchDetail matchId={TEST_MATCH_ID} />
-
-        </div>
+                {/* 잘못된 경로는 홈으로 리다이렉트 */}
+                <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+        </Router>
     );
 };
 

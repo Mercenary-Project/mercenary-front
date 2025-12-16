@@ -2,27 +2,26 @@
 
 import React, { useState } from 'react';
 
-// API 응답의 Message만 받음
 interface ApiResponse {
     code: number;
     message: string;
 }
 
-// MatchList에서 매치 ID를 프롭스로 받는다고 가정
+// 💡 [핵심] onApplySuccess (갱신 함수)를 받도록 타입 정의 추가
 interface MatchDetailProps {
     matchId: number;
+    onApplySuccess: () => void; // 부모가 내려준 함수
 }
 
-const MatchDetail: React.FC<MatchDetailProps> = ({ matchId }) => {
+const MatchDetail: React.FC<MatchDetailProps> = ({ matchId, onApplySuccess }) => {
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
-    // [핵심] Redisson 락이 적용된 API 호출
     const handleApply = async () => {
         setIsLoading(true);
         setStatusMessage('신청 처리 중...');
 
-        // 💡 [Mock User ID] 실제 로그인 대신 임시 사용자 ID (100)를 사용합니다.
+        // [Mock User ID] 테스트용 ID
         const mockUserId = 100;
 
         const url = `/api/matches/${matchId}/apply`;
@@ -38,14 +37,16 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId }) => {
 
             const jsonResponse: ApiResponse = await response.json();
 
-            // 200 OK (성공), 400 Bad Request (실패: 마감/중복)
             if (jsonResponse.code === 200) {
-                setStatusMessage(` 신청 성공! 현재 인원수가 변경되었는지 확인하세요.`);
+                setStatusMessage(`✅ 신청 성공!`);
+
+                // 💡 [핵심] 신청 성공 시 부모에게 알려서 목록/지도 갱신
+                onApplySuccess();
+
             } else if (jsonResponse.code === 400) {
-                // Global Exception Handler가 처리한 '정원 마감' 등의 메시지
-                setStatusMessage(` 신청 실패: ${jsonResponse.message}`);
+                setStatusMessage(`❌ 신청 실패: ${jsonResponse.message}`);
             } else {
-                setStatusMessage(`알 수 없는 오류: ${jsonResponse.message}`);
+                setStatusMessage(`⚠️ 오류: ${jsonResponse.message}`);
             }
 
         } catch (err) {
@@ -57,19 +58,28 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId }) => {
     };
 
     return (
-        <div style={{ padding: '15px', border: '1px solid #ddd', marginTop: '20px' }}>
-            <h3>{matchId}번 매치 신청</h3>
-            <p>⚠️ 주의: 이 버튼은 백엔드의 분산 락 로직을 호출합니다.</p>
+        <div style={{ padding: '20px', border: '2px solid #007bff', borderRadius: '8px', marginTop: '20px', backgroundColor: '#f0f8ff' }}>
+            <h3>⚽ 매치 신청 테스트 (Redisson Lock 검증)</h3>
+            <p>아래 버튼을 누르면 <strong>{matchId}번 매치</strong>에 선착순 신청을 시도합니다.</p>
 
             <button
                 onClick={handleApply}
                 disabled={isLoading}
-                style={{ padding: '10px 20px', backgroundColor: isLoading ? '#ccc' : '#007bff', color: 'white', border: 'none' }}
+                style={{
+                    padding: '12px 24px',
+                    backgroundColor: isLoading ? '#ccc' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold'
+                }}
             >
-                {isLoading ? '처리 중...' : '용병 신청하기'}
+                {isLoading ? '처리 중...' : '지금 용병 신청하기'}
             </button>
 
-            {statusMessage && <p style={{ marginTop: '10px', fontWeight: 'bold' }}>{statusMessage}</p>}
+            {statusMessage && <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '1.1em' }}>{statusMessage}</p>}
         </div>
     );
 };
