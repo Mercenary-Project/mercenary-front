@@ -1,42 +1,62 @@
-// src/pages/LoginCallback.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 
 const LoginCallback: React.FC = () => {
-    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const code = searchParams.get('code');
+    const [searchParams] = useSearchParams();
+
+    //  중요: 요청을 보냈는지 체크하는 변수 (화면이 그려져도 초기화 안 됨)
+    const hasFetched = useRef(false);
 
     useEffect(() => {
-        if (code) {
-            // 1. 백엔드에 인증 코드 전달
-            fetch('/api/auth/kakao', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code }),
-            })
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data.accessToken) {
-                        // 2. 받은 JWT를 브라우저에 저장
-                        localStorage.setItem('accessToken', data.accessToken);
-                        console.log('✅ 로그인 성공! JWT 저장 완료');
-                        // 3. 메인 페이지로 이동
-                        navigate('/');
-                    }
-                })
-                .catch((err) => {
-                    console.error('❌ 로그인 요청 실패:', err);
-                    alert('로그인에 실패했습니다.');
-                    navigate('/login');
+        const code = searchParams.get('code');
+
+        // 1. 코드가 없거나, 이미 요청을 보낸 상태면 아무것도 하지 않음 (중복 방지)
+        if (!code || hasFetched.current) return;
+
+        // 2. "나 이제 요청 보낸다!" 라고 표시
+        hasFetched.current = true;
+
+        const login = async () => {
+            try {
+                console.log("백엔드로 인가 코드 전송:", code);
+
+                const response = await axios.post('http://localhost:8080/api/auth/kakao', {
+                    code: code,
                 });
-        }
-    }, [code, navigate]);
+
+                // 성공 시
+                console.log("로그인 성공 응답:", response.data);
+                const { accessToken } = response.data;
+
+                localStorage.setItem('accessToken', accessToken);
+                alert('로그인 성공! 환영합니다.');
+
+                // 메인 페이지로 이동
+                navigate('/', { replace: true });
+
+            } catch (error) {
+                console.error("로그인 실패:", error);
+                alert("로그인 처리에 실패했습니다. 다시 시도해주세요.");
+                navigate('/login', { replace: true });
+            }
+        };
+
+        login();
+
+    }, [searchParams, navigate]);
 
     return (
-        <div style={{ textAlign: 'center', marginTop: '100px' }}>
-            <h2>로그인 처리 중입니다... ⚽</h2>
-            <p>잠시만 기다려 주세요.</p>
+        <div style={{
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center'
+        }}>
+            <h2>로그인 처리 중입니다...</h2>
+            <p>잠시만 기다려주세요.</p>
         </div>
     );
 };

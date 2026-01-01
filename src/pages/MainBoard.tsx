@@ -1,79 +1,96 @@
-// src/pages/MainBoard.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom'; // 로그아웃용
-import MatchList from '../components/MatchList';
-import MatchDetail from '../components/MatchDetail';
-import MatchCreateForm from '../components/MatchCreateForm';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MatchMap from '../components/MatchMap';
-
-export interface Match {
-    matchId: number; placeName: string; district: string;
-    matchDate: string; maxPlayerCount: number; currentPlayerCount: number;
-    distance: number; latitude: number; longitude: number;
-}
+import MatchList from '../components/MatchList';
 
 const MainBoard: React.FC = () => {
     const navigate = useNavigate();
-    const [matches, setMatches] = useState<Match[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
 
-    const fetchMatches = useCallback(async () => {
-        setLoading(true);
-        const myLatitude = 37.500000;
-        const myLongitude = 127.030000;
-        const distanceKm = 10;
-        const url = `/api/matches/nearby?latitude=${myLatitude}&longitude=${myLongitude}&distanceKm=${distanceKm}`;
+    // 1. 가짜 데이터 (Mock Data)
+    // MatchList.tsx가 요구하는 모든 필드(maxPlayerCount, currentPlayerCount, distance)를 추가했습니다.
+    const [matches] = useState([
+        {
+            matchId: 1,
+            title: "잠실 풋살 6vs6 하실 분!",
+            matchDate: "2024-05-20T19:00:00", // 날짜+시간 포맷
+            matchTime: "19:00",
+            placeName: "잠실 풋살장",
+            district: "송파구",
+            latitude: 37.512257,
+            longitude: 127.100222,
 
-        try {
-            const response = await fetch(url);
-            const jsonResponse = await response.json();
-            if (jsonResponse.code === 200) {
-                setMatches(jsonResponse.data);
-                setError(null);
-            } else {
-                setMatches([]);
-                if(jsonResponse.code !== 200) setError(jsonResponse.message);
-            }
-        } catch (err) {
-            setError('서버 연결에 실패했습니다.');
-        } finally {
-            setLoading(false);
+            // 🔥 여기 3개가 빠져서 에러가 났던 겁니다! 추가 완료!
+            maxPlayerCount: 12,
+            currentPlayerCount: 10,
+            distance: 2.5,
+
+            fullAddress: "서울시 송파구 올림픽로 25",
+            content: "초보도 환영합니다.",
+            viewCount: 0,
+            chatCount: 0,
+            status: "RECRUITING"
+        },
+        {
+            matchId: 2,
+            title: "강남역 축구 용병 급구",
+            matchDate: "2024-05-21T10:00:00",
+            matchTime: "10:00",
+            placeName: "강남역 인근",
+            district: "강남구",
+            latitude: 37.497942,
+            longitude: 127.027621,
+
+            // 🔥 두 번째 데이터에도 추가 완료!
+            maxPlayerCount: 11,
+            currentPlayerCount: 1,
+            distance: 0.8,
+
+            fullAddress: "서울시 강남구 강남대로",
+            content: "골키퍼 보시는 분 환영합니다.",
+            viewCount: 5,
+            chatCount: 2,
+            status: "RECRUITING"
         }
-    }, []);
+    ]);
 
-    useEffect(() => { fetchMatches(); }, [fetchMatches]);
-
-    // 로그아웃 처리
     const handleLogout = () => {
         localStorage.removeItem('accessToken');
         navigate('/login');
     };
 
-    const isLoggedIn = !!localStorage.getItem('accessToken');
-
     return (
-        <div className="app-container">
-            <header className="app-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h1>⚽ Mercenary</h1>
-                    {isLoggedIn ? (
-                        <button onClick={handleLogout} className="logout-btn">로그아웃</button>
-                    ) : (
-                        <button onClick={() => navigate('/login')} className="login-btn">로그인</button>
-                    )}
+        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+            {/* 상단 헤더 */}
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h1 style={{ fontSize: '24px', margin: 0 }}>⚽ 용병 구하기</h1>
+                <div>
+                    <button
+                        onClick={() => navigate('/match/create')}
+                        style={{ marginRight: '10px', padding: '10px 20px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                        + 매치 등록
+                    </button>
+                    <button
+                        onClick={handleLogout}
+                        style={{ padding: '10px 15px', backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                        로그아웃
+                    </button>
                 </div>
-                <p>위치 기반 실시간 용병 매칭 서비스</p>
             </header>
 
-            <main>
-                <section className="section-container"><MatchCreateForm onMatchCreated={fetchMatches} /></section>
-                <hr className="section-divider" />
-                <section className="section-container"><MatchMap matches={matches} /></section>
-                <section className="section-container"><MatchList matches={matches} loading={loading} error={error} /></section>
-                <hr className="section-divider" />
-                <section className="section-container"><MatchDetail matchId={1} onApplySuccess={fetchMatches} /></section>
-            </main>
+            {/* 메인 컨텐츠 영역 */}
+            <div style={{ display: 'flex', gap: '20px', flexDirection: 'column' }}>
+                {/* 1. 지도 영역 */}
+                <div style={{ height: '400px', backgroundColor: '#f0f0f0', borderRadius: '12px', overflow: 'hidden' }}>
+                    <MatchMap matches={matches} />
+                </div>
+
+                {/* 2. 리스트 영역 */}
+                <div>
+                    <MatchList matches={matches} loading={false} error={null} />
+                </div>
+            </div>
         </div>
     );
 };
