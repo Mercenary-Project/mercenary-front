@@ -75,9 +75,9 @@ const MatchMap: React.FC<MatchMapProps> = ({ matches }) => {
     }, [matches]);
 
     return (
-        <div style={{ marginTop: '20px', border: '2px solid #ddd', borderRadius: '8px', padding: '10px' }}>
+        <div style={{marginTop: '20px', border: '2px solid #ddd', borderRadius: '8px', padding: '10px',color: 'black'}}>
             <h3>🗺️ 지도 보기 (Redis Geo 시각화)</h3>
-            <div ref={mapContainer} style={{ width: '100%', height: '400px', borderRadius: '4px' }} />
+            <div ref={mapContainer} style={{width: '100%', height: '400px', borderRadius: '4px',color: 'black'}}/>
         </div>
     );
 };
