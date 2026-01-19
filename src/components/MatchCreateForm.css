@@ -1,105 +1,219 @@
-.match-create-form-container {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 20px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    background-color: #f9f9f9;
-}
-
-.match-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.form-group label {
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-.form-group input,
-.form-group textarea {
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
+/* 📱 전체 컨테이너: 아이폰 12 Pro 규격 (390px) */
+.mc-container {
     width: 100%;
+    max-width: 390px;
+    margin: 0 auto;
+    background-color: #f5f7fa;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: 50px;
+
+    /* PC 그림자 */
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
+}
+
+/* 헤더 영역 */
+.mc-header {
+    background-color: white;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    max-width: 390px;
+    margin: 0 auto;
+}
+
+.mc-back-btn {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #333;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.mc-header-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+/* 본문 레이아웃 */
+.mc-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 카드 스타일 */
+.mc-card {
+    background-color: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    border: 1px solid #f0f0f0;
+}
+
+.mc-section-title {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #333;
+    border-left: 3px solid #4CAF50;
+    padding-left: 8px;
+}
+
+/* 입력 폼 공통 */
+.mc-input-group {
+    margin-bottom: 12px;
+}
+
+.mc-row {
+    display: flex;
+    gap: 10px; /* 간격 살짝 넓힘 */
+}
+
+.mc-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    white-space: nowrap; /* ★라벨 줄바꿈 방지 추가★ */
+}
+
+/* 인풋창 스타일 */
+.mc-input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 15px;
     box-sizing: border-box;
+    outline: none;
+    background-color: #ffffff !important;
+    color: #333333 !important;
+    color-scheme: light;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
 }
 
-.address-display {
-    background-color: #eee;
-    flex-grow: 1;
+.mc-input:focus {
+    border-color: #4CAF50;
 }
 
-.search-button {
-    padding: 10px 15px;
-    background-color: #5cb85c;
+.mc-textarea {
+    width: 100%;
+    height: 100px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 15px;
+    box-sizing: border-box;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    background-color: #ffffff !important;
+    color: #333333 !important;
+    -webkit-appearance: none;
+}
+
+.mc-textarea:focus {
+    border-color: #4CAF50;
+}
+
+/* 검색바 영역 */
+.mc-search-box {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.mc-search-input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    outline: none;
+    background-color: #ffffff !important;
+    color: #333333 !important;
+    -webkit-appearance: none;
+}
+
+.mc-search-btn {
+    padding: 0 16px;
+    background-color: #333;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
     white-space: nowrap;
 }
 
-.submit-button {
+/* 지도 영역 */
+.mc-map-area {
+    width: 100%;
+    height: 200px;
+    border-radius: 8px;
+    background-color: #eee;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+}
+
+/* 위치 결과 박스 */
+.mc-location-result {
+    background-color: #f9f9f9;
     padding: 12px;
-    background-color: #007bff;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.mc-readonly-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    background-color: #fff;
+    color: #555;
+    font-size: 13px;
+    box-sizing: border-box;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+/* 하단 버튼 */
+.mc-submit-btn {
+    width: 100%;
+    padding: 15px;
+    background-color: #4CAF50;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 12px;
     font-size: 16px;
+    font-weight: 700;
     cursor: pointer;
     margin-top: 10px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-.submit-button:disabled {
-    background-color: #ccc;
-}
-
-/* 팝업 스타일 */
-.postcode-popup {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
-    max-width: 500px;
-    height: 80%;
-    background: white;
-    border: 2px solid #333;
-    z-index: 9999;
-    padding: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    display: flex;
-    flex-direction: column;
-}
-
-.close-popup-button {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    cursor: pointer;
-}
-
-.status-message {
-    margin-top: 15px;
-    font-weight: bold;
-    padding: 10px;
-    background-color: #fff3cd;
-    color: #856404;
-    border-radius: 4px;
-}
-
-.hidden-geo {
-    display: none;
+.mc-submit-btn:active {
+    background-color: #43a047;
+    transform: scale(0.98);
 }

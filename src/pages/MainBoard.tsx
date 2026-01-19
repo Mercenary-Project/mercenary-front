@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MatchMap from '../components/MatchMap';
 import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
+import './MainBoard.css';
 
 declare global {
     interface Window {
@@ -141,7 +142,7 @@ const MainBoard: React.FC = () => {
                     <div style={{ display: 'flex', gap: '10px' }}>
                         {isLoggedIn ? (
                             <>
-                                <button onClick={() => navigate('/match/create')} style={styles.primaryBtn}>+ 등록</button>
+                                <button onClick={() => navigate('/match/create')} style={styles.primaryBtn}>등록</button>
                                 <button onClick={handleLogout} style={styles.secondaryBtn}>로그아웃</button>
                             </>
                         ) : (
@@ -167,7 +168,7 @@ const MainBoard: React.FC = () => {
             {/* 메인 컨텐츠 (지도 + 리스트) */}
             <div style={{ display: 'flex', flex: 1, flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden', padding: '10px', gap: '10px' }}>
 
-                {/* ✅ [수정 2] 지도에 테두리(border) 추가 */}
+                {/* 지도에  */}
                 <div style={{
                     flex: isMobile ? '0 0 55%' : '1',
                     position: 'relative',
