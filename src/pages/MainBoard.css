@@ -1,0 +1,187 @@
+/* 📱 전체 컨테이너: 모바일 규격 (390px) */
+.mb-container {
+    width: 100%;
+    max-width: 390px;
+    margin: 0 auto;
+    background-color: #f5f7fa; /* 연한 회색 배경 */
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    position: relative;
+
+    /* PC 화면에서 볼 때 그림자 */
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
+}
+
+/* 상단 헤더 */
+.mb-header {
+    background-color: white;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid #eee;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.mb-logo {
+    font-size: 20px;
+    font-weight: 800;
+    color: #4CAF50; /* 메인 컬러 */
+    cursor: pointer;
+}
+
+/* 리스트 영역 */
+.mb-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 80px; /* 하단 버튼 가림 방지 */
+}
+
+/* 매치 카드 디자인 */
+.mb-card {
+    background-color: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    border: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mb-card:active {
+    transform: scale(0.98);
+}
+
+/* 카드 상단: 상태 배지 + 날짜 */
+.mb-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.mb-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+}
+
+.mb-status-badge.recruiting {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.mb-status-badge.closed {
+    background-color: #f5f5f5;
+    color: #757575;
+}
+
+.mb-date {
+    font-size: 13px;
+    color: #888;
+    font-weight: 500;
+}
+
+/* 카드 제목 */
+.mb-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #333;
+    margin: 0;
+    line-height: 1.4;
+
+    /* 긴 제목 말줄임표 처리 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 카드 위치 정보 */
+.mb-location {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: #666;
+}
+
+/* 인원 현황 (게이지 바) */
+.mb-footer {
+    margin-top: 4px;
+}
+
+.mb-player-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.mb-progress-bg {
+    width: 100%;
+    height: 8px;
+    background-color: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mb-progress-bar {
+    height: 100%;
+    background-color: #4CAF50;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* 마감 임박 시 색상 변경 (노란색/빨간색) */
+.mb-progress-bar.warning { background-color: #FFC107; }
+.mb-progress-bar.full { background-color: #F44336; }
+
+/* 플로팅 글쓰기 버튼 (우측 하단) */
+.mb-fab {
+    position: fixed;
+    bottom: 24px;
+    /* 390px 컨테이너 기준 위치 잡기 위해 calc 사용 */
+    left: 50%;
+    transform: translateX(130px); /* 390px의 절반(195)에서 버튼 크기 고려하여 조정 */
+
+    width: 56px;
+    height: 56px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 30px;
+    border: none;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+.mb-fab:active {
+    background-color: #43a047;
+}
+
+/* 화면이 아주 넓을 때 FAB 위치 고정 보정 */
+@media (min-width: 400px) {
+    .mb-fab {
+        left: auto;
+        right: calc(50% - 195px + 20px); /* 중앙 정렬된 컨테이너 우측에 붙임 */
+        transform: none;
+    }
+}
