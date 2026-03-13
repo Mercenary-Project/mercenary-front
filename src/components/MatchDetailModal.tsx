@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface MatchDetailModalProps {
     matchId: number;
@@ -20,9 +21,11 @@ interface MatchDetailDto {
     status?: string;
 }
 
+type ApplicationDecisionStatus = 'READY' | 'APPROVED' | 'REJECTED';
+
 type MyApplicationStatus = {
     applied: boolean;
-    status: 'READY' | 'APPROVED' | 'REJECTED' | null;
+    status: ApplicationDecisionStatus | null;
     applicationId: number | null;
 };
 
@@ -30,13 +33,14 @@ type ApplicationSummary = {
     applicationId: number;
     applicantId: number;
     applicantNickname: string;
-    status: 'READY' | 'APPROVED' | 'REJECTED';
+    status: ApplicationDecisionStatus;
     createdAt: string;
 };
 
 interface ApiEnvelope<T> {
-    data?: T;
+    code?: string | number;
     message?: string;
+    data?: T | null;
 }
 
 interface TokenClaims {
@@ -77,13 +81,41 @@ const decodeAccessToken = (token: string | null): TokenClaims | null => {
     }
 };
 
-const extractResponseData = <T,>(payload: ApiEnvelope<T> | T): T => {
-    if (payload && typeof payload === 'object' && 'data' in (payload as ApiEnvelope<T>)) {
-        const wrapped = payload as ApiEnvelope<T>;
-        return (wrapped.data ?? payload) as T;
+const extractResponseData = <T,>(payload: ApiEnvelope<T> | T | null): T | null => {
+    if (!payload) {
+        return null;
+    }
+
+    if (typeof payload === 'object' && 'data' in (payload as ApiEnvelope<T>)) {
+        return ((payload as ApiEnvelope<T>).data ?? null) as T | null;
     }
 
     return payload as T;
+};
+
+const extractResponseMessage = (payload: unknown, fallback: string) => {
+    if (payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string') {
+        return payload.message;
+    }
+
+    return fallback;
+};
+
+const normalizeMyApplicationStatus = (data: unknown): MyApplicationStatus => {
+    if (!data || typeof data !== 'object') {
+        return DEFAULT_APPLICATION_STATUS;
+    }
+
+    const candidate = data as Partial<MyApplicationStatus>;
+
+    return {
+        applied:
+            typeof candidate.applied === 'boolean'
+                ? candidate.applied
+                : Boolean(candidate.status ?? candidate.applicationId),
+        status: (candidate.status as ApplicationDecisionStatus | null | undefined) ?? null,
+        applicationId: typeof candidate.applicationId === 'number' ? candidate.applicationId : null,
+    };
 };
 
 const formatApplicationStatus = (status: MyApplicationStatus['status']) => {
@@ -102,9 +134,9 @@ const formatApplicationStatus = (status: MyApplicationStatus['status']) => {
 const formatReviewStatus = (status: ApplicationSummary['status']) => {
     switch (status) {
         case 'READY':
-            return '대기중';
+            return '대기 중';
         case 'APPROVED':
-            return '승인됨';
+            return '승인 완료';
         case 'REJECTED':
             return '거절됨';
         default:
@@ -129,17 +161,18 @@ const formatDateTime = (value: string) => {
 };
 
 const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose }) => {
+    const navigate = useNavigate();
     const [match, setMatch] = useState<MatchDetailDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [detailError, setDetailError] = useState<string | null>(null);
     const [myApplication, setMyApplication] = useState<MyApplicationStatus>(DEFAULT_APPLICATION_STATUS);
     const [isStatusLoading, setIsStatusLoading] = useState(false);
     const [isApplying, setIsApplying] = useState(false);
-    const [isApplicationsOpen, setIsApplicationsOpen] = useState(false);
     const [applications, setApplications] = useState<ApplicationSummary[]>([]);
     const [applicationsError, setApplicationsError] = useState<string | null>(null);
     const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
     const [processingApplicationId, setProcessingApplicationId] = useState<number | null>(null);
+    const [canManageApplications, setCanManageApplications] = useState(false);
 
     const token = localStorage.getItem('accessToken');
     const claims = decodeAccessToken(token);
@@ -149,13 +182,16 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         claims?.id ??
         (claims?.sub && /^\d+$/.test(claims.sub) ? Number(claims.sub) : undefined);
     const currentNickname = claims?.nickname ?? claims?.name ?? claims?.sub;
-    const isAuthor = Boolean(
+    const isAuthorByPayload = Boolean(
         match &&
         (
             (typeof currentUserId === 'number' && typeof match.writerId === 'number' && currentUserId === match.writerId) ||
             (currentNickname && (currentNickname === match.writerNickname || currentNickname === match.writerName))
         )
     );
+    const isClosed = match?.status === 'CLOSED';
+    const shouldShowManagementUi = isAuthorByPayload || canManageApplications;
+    const isJoinDisabled = !token || isApplying || isStatusLoading || myApplication.applied || isClosed;
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -165,68 +201,74 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         };
     }, []);
 
-    useEffect(() => {
-        const fetchDetail = async () => {
-            setLoading(true);
-            setDetailError(null);
+    const fetchDetail = useCallback(async () => {
+        setLoading(true);
+        setDetailError(null);
 
-            try {
-                const response = await fetch(`/api/matches/${matchId}`);
+        try {
+            const response = await fetch(`/api/matches/${matchId}`);
+            const payload = await response.json().catch(() => null);
 
-                if (!response.ok) {
-                    throw new Error('매치 상세 정보를 불러오지 못했습니다.');
-                }
-
-                const payload = await response.json();
-                setMatch(extractResponseData<MatchDetailDto>(payload));
-            } catch (error) {
-                console.error(error);
-                setDetailError(error instanceof Error ? error.message : '매치 상세 정보를 불러오지 못했습니다.');
-            } finally {
-                setLoading(false);
+            if (!response.ok) {
+                throw new Error(extractResponseMessage(payload, '매치 상세 정보를 불러오지 못했습니다.'));
             }
-        };
 
-        fetchDetail();
+            const data = extractResponseData<MatchDetailDto>(payload);
+
+            if (!data) {
+                throw new Error('매치 상세 정보가 비어 있습니다.');
+            }
+
+            setMatch(data);
+        } catch (error) {
+            console.error(error);
+            setDetailError(error instanceof Error ? error.message : '매치 상세 정보를 불러오지 못했습니다.');
+        } finally {
+            setLoading(false);
+        }
     }, [matchId]);
 
-    useEffect(() => {
-        const fetchMyApplicationStatus = async () => {
-            if (!token) {
+    const fetchMyApplicationStatus = useCallback(async () => {
+        if (!token) {
+            setMyApplication(DEFAULT_APPLICATION_STATUS);
+            return;
+        }
+
+        setIsStatusLoading(true);
+
+        try {
+            const response = await fetch(`/api/matches/${matchId}/application/me`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.status === 404) {
                 setMyApplication(DEFAULT_APPLICATION_STATUS);
                 return;
             }
 
-            setIsStatusLoading(true);
+            const payload = await response.json().catch(() => null);
 
-            try {
-                const response = await fetch(`/api/matches/${matchId}/application/me`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('신청 상태를 불러오지 못했습니다.');
-                }
-
-                const payload = await response.json();
-                setMyApplication(extractResponseData<MyApplicationStatus>(payload));
-            } catch (error) {
-                console.error(error);
-                setMyApplication(DEFAULT_APPLICATION_STATUS);
-            } finally {
-                setIsStatusLoading(false);
+            if (!response.ok) {
+                throw new Error(extractResponseMessage(payload, '내 신청 상태를 불러오지 못했습니다.'));
             }
-        };
 
-        fetchMyApplicationStatus();
+            setMyApplication(normalizeMyApplicationStatus(extractResponseData(payload)));
+        } catch (error) {
+            console.error(error);
+            setMyApplication(DEFAULT_APPLICATION_STATUS);
+        } finally {
+            setIsStatusLoading(false);
+        }
     }, [matchId, token]);
 
-    const fetchApplications = async () => {
+    const fetchApplications = useCallback(async () => {
         if (!token) {
-            setApplicationsError('로그인 후 신청자 목록을 확인할 수 있습니다.');
-            return;
+            setApplications([]);
+            setApplicationsError(null);
+            setCanManageApplications(false);
+            return false;
         }
 
         setIsApplicationsLoading(true);
@@ -238,41 +280,77 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                     Authorization: `Bearer ${token}`,
                 },
             });
+            const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error('신청자 목록을 불러오지 못했습니다.');
+                if (response.status === 403) {
+                    setApplications([]);
+                    setCanManageApplications(false);
+                    return false;
+                }
+
+                throw new Error(extractResponseMessage(payload, '신청자 목록을 불러오지 못했습니다.'));
             }
 
-            const payload = await response.json();
-            setApplications(extractResponseData<ApplicationSummary[]>(payload));
+            const data = extractResponseData<ApplicationSummary[]>(payload);
+            setApplications(Array.isArray(data) ? data : []);
+            setCanManageApplications(true);
+            return true;
         } catch (error) {
             console.error(error);
+            setApplications([]);
+            setCanManageApplications(false);
             setApplicationsError(error instanceof Error ? error.message : '신청자 목록을 불러오지 못했습니다.');
+            return false;
         } finally {
             setIsApplicationsLoading(false);
         }
-    };
+    }, [matchId, token]);
 
-    const handleOpenApplications = async () => {
-        setIsApplicationsOpen(true);
-        await fetchApplications();
+    useEffect(() => {
+        void fetchDetail();
+    }, [fetchDetail]);
+
+    useEffect(() => {
+        if (!token) {
+            setCanManageApplications(false);
+            void fetchMyApplicationStatus();
+            return;
+        }
+
+        if (isAuthorByPayload) {
+            void fetchApplications();
+            return;
+        }
+
+        const resolveRole = async () => {
+            const canManage = await fetchApplications();
+
+            if (!canManage) {
+                await fetchMyApplicationStatus();
+            }
+        };
+
+        void resolveRole();
+    }, [fetchApplications, fetchMyApplicationStatus, isAuthorByPayload, token]);
+
+    const handleLoginRedirect = () => {
+        alert('로그인이 필요합니다.');
+        onClose();
+        navigate('/login');
     };
 
     const handleJoin = async () => {
-        if (!match || isApplying) {
+        if (!match || isApplying || myApplication.applied || isClosed) {
             return;
         }
 
         if (!token) {
-            alert('로그인 후 참가 신청할 수 있습니다.');
+            handleLoginRedirect();
             return;
         }
 
-        if (myApplication.applied) {
-            return;
-        }
-
-        if (!window.confirm(`'${match.title}' 경기에 참가 신청하시겠습니까?`)) {
+        if (!window.confirm(`'${match.title}' 매치에 참가 신청하시겠습니까?`)) {
             return;
         }
 
@@ -285,29 +363,14 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                     Authorization: `Bearer ${token}`,
                 },
             });
-
             const payload = await response.json().catch(() => null);
-            const data = payload ? extractResponseData<MyApplicationStatus | { message?: string }>(payload) : null;
 
             if (!response.ok) {
-                const message =
-                    typeof data === 'object' && data && 'message' in data && typeof data.message === 'string'
-                        ? data.message
-                        : '참가 신청에 실패했습니다.';
-                throw new Error(message);
-            }
-
-            if (data && typeof data === 'object' && 'applied' in data) {
-                setMyApplication(data as MyApplicationStatus);
-            } else {
-                setMyApplication({
-                    applied: true,
-                    status: 'READY',
-                    applicationId: null,
-                });
+                throw new Error(extractResponseMessage(payload, '참가 신청에 실패했습니다.'));
             }
 
             alert('참가 신청이 완료되었습니다.');
+            await fetchMyApplicationStatus();
         } catch (error) {
             console.error(error);
             alert(error instanceof Error ? error.message : '참가 신청 중 오류가 발생했습니다.');
@@ -335,22 +398,13 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                 },
                 body: JSON.stringify({ status }),
             });
-
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
-                const message =
-                    payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
-                        ? payload.message
-                        : '신청 상태 변경에 실패했습니다.';
-                throw new Error(message);
+                throw new Error(extractResponseMessage(payload, '신청 상태 변경에 실패했습니다.'));
             }
 
-            setApplications((prev) =>
-                prev.map((application) =>
-                    application.applicationId === applicationId ? { ...application, status } : application,
-                ),
-            );
+            await Promise.all([fetchApplications(), fetchDetail()]);
         } catch (error) {
             console.error(error);
             alert(error instanceof Error ? error.message : '신청 상태 변경 중 오류가 발생했습니다.');
@@ -363,150 +417,178 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         return null;
     }
 
-    return (
-        <>
-            <div style={styles.overlay} onClick={onClose}>
-                <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-                    <button style={styles.closeBtn} onClick={onClose} aria-label="닫기">
-                        X
+    const renderJoinSection = () => {
+        if (!token) {
+            return (
+                <>
+                    <button
+                        onClick={handleLoginRedirect}
+                        style={{ ...styles.joinBtn, backgroundColor: '#2563eb', cursor: 'pointer' }}
+                    >
+                        로그인 후 신청하기
                     </button>
+                    <p style={styles.applicationHint}>비로그인 상태에서는 로그인 후 신청할 수 있습니다.</p>
+                </>
+            );
+        }
 
-                    {match && !detailError ? (
-                        <>
-                            <div style={styles.header}>
-                                <h2 style={styles.title}>{match.title}</h2>
-                                <span style={match.status === 'CLOSED' ? styles.badgeClosed : styles.badgeOpen}>
-                                    {match.status === 'CLOSED' ? '마감' : '모집중'}
+        return (
+            <>
+                <button
+                    onClick={handleJoin}
+                    style={{
+                        ...styles.joinBtn,
+                        backgroundColor: myApplication.applied || isClosed ? '#94a3b8' : isApplying ? '#93c5fd' : '#2563eb',
+                        cursor: isJoinDisabled ? 'not-allowed' : 'pointer',
+                    }}
+                    disabled={isJoinDisabled}
+                >
+                    {isClosed
+                        ? '모집 마감'
+                        : isStatusLoading
+                            ? '신청 상태 확인 중...'
+                            : isApplying
+                                ? '신청 처리 중...'
+                                : formatApplicationStatus(myApplication.status)}
+                </button>
+                {myApplication.applied ? (
+                    <p style={styles.applicationHint}>현재 상태: {formatApplicationStatus(myApplication.status)}</p>
+                ) : null}
+            </>
+        );
+    };
+
+    return (
+        <div style={styles.overlay} onClick={onClose}>
+            <div style={styles.modal} onClick={(event) => event.stopPropagation()}>
+                <button style={styles.closeBtn} onClick={onClose} aria-label="닫기">
+                    X
+                </button>
+
+                {match && !detailError ? (
+                    <>
+                        <div style={styles.header}>
+                            <h2 style={styles.title}>{match.title}</h2>
+                            <span style={isClosed ? styles.badgeClosed : styles.badgeOpen}>
+                                {isClosed ? '모집 마감' : '모집 중'}
+                            </span>
+                        </div>
+
+                        <div style={styles.infoList}>
+                            <div style={styles.infoItem}>
+                                <span style={styles.icon}>일시</span>
+                                <span>{formatDateTime(match.matchDate)}</span>
+                            </div>
+
+                            <div style={styles.infoItem}>
+                                <span style={styles.icon}>장소</span>
+                                <div>
+                                    <span style={styles.primaryText}>{match.placeName}</span>
+                                    {match.addressName ? <div>{match.addressName}</div> : null}
+                                </div>
+                            </div>
+
+                            <div style={styles.infoItem}>
+                                <span style={styles.icon}>인원</span>
+                                <span>
+                                    현재 <span style={styles.highlightText}>{match.currentPlayerCount}</span>명 / 총 {match.maxPlayerCount}명
                                 </span>
                             </div>
 
-                            <div style={styles.infoList}>
+                            {match.writerName || match.writerNickname ? (
                                 <div style={styles.infoItem}>
-                                    <span style={styles.icon}>일시</span>
-                                    <span>{formatDateTime(match.matchDate)}</span>
+                                    <span style={styles.icon}>작성자</span>
+                                    <span>{match.writerNickname || match.writerName}</span>
                                 </div>
-
-                                <div style={styles.infoItem}>
-                                    <span style={styles.icon}>장소</span>
-                                    <div>
-                                        <span style={{ fontWeight: 'bold' }}>{match.placeName}</span>
-                                        {match.addressName ? <div>{match.addressName}</div> : null}
-                                    </div>
-                                </div>
-
-                                <div style={styles.infoItem}>
-                                    <span style={styles.icon}>인원</span>
-                                    <span>
-                                        현재 <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>{match.currentPlayerCount}</span>명 /
-                                        총 {match.maxPlayerCount}명
-                                    </span>
-                                </div>
-
-                                {match.writerName || match.writerNickname ? (
-                                    <div style={styles.infoItem}>
-                                        <span style={styles.icon}>작성자</span>
-                                        <span>{match.writerNickname || match.writerName}</span>
-                                    </div>
-                                ) : null}
-                            </div>
-
-                            <div style={styles.contentBox}>
-                                <h4 style={styles.contentLabel}>상세 내용</h4>
-                                <p style={styles.contentText}>{match.content || '상세 내용이 없습니다.'}</p>
-                            </div>
-
-                            <div style={styles.footer}>
-                                {isAuthor ? (
-                                    <button onClick={handleOpenApplications} style={styles.manageBtn}>
-                                        신청자 목록 보기
-                                    </button>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={handleJoin}
-                                            style={{
-                                                ...styles.joinBtn,
-                                                backgroundColor: myApplication.applied ? '#94a3b8' : isApplying ? '#93c5fd' : '#3b82f6',
-                                                cursor: myApplication.applied || isApplying ? 'not-allowed' : 'pointer',
-                                            }}
-                                            disabled={myApplication.applied || isApplying || isStatusLoading}
-                                        >
-                                            {isStatusLoading ? '상태 확인 중...' : isApplying ? '신청 처리 중...' : formatApplicationStatus(myApplication.status)}
-                                        </button>
-                                        {myApplication.applied ? (
-                                            <p style={styles.applicationHint}>
-                                                현재 상태: {formatApplicationStatus(myApplication.status)}
-                                            </p>
-                                        ) : null}
-                                    </>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        <div style={styles.emptyState}>{detailError || '정보를 불러오지 못했습니다.'}</div>
-                    )}
-                </div>
-            </div>
-
-            {isApplicationsOpen ? (
-                <div style={styles.subOverlay} onClick={() => setIsApplicationsOpen(false)}>
-                    <div style={styles.subModal} onClick={(e) => e.stopPropagation()}>
-                        <div style={styles.subHeader}>
-                            <h3 style={styles.subTitle}>신청자 목록</h3>
-                            <button style={styles.closeBtn} onClick={() => setIsApplicationsOpen(false)} aria-label="닫기">
-                                X
-                            </button>
+                            ) : null}
                         </div>
 
-                        {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중...</p> : null}
-                        {applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
+                        <div style={styles.contentBox}>
+                            <h4 style={styles.contentLabel}>상세 내용</h4>
+                            <p style={styles.contentText}>{match.content || '등록된 상세 내용이 없습니다.'}</p>
+                        </div>
 
-                        {!isApplicationsLoading && !applicationsError ? (
-                            applications.length > 0 ? (
-                                <div style={styles.applicationList}>
-                                    {applications.map((application) => (
-                                        <div key={application.applicationId} style={styles.applicationCard}>
-                                            <div style={styles.applicationMeta}>
-                                                <strong>{application.applicantNickname}</strong>
-                                                <span>{formatReviewStatus(application.status)}</span>
-                                            </div>
-                                            <div style={styles.applicationSubMeta}>
-                                                <span>ID {application.applicantId}</span>
-                                                <span>{formatDateTime(application.createdAt)}</span>
-                                            </div>
-                                            <div style={styles.actionRow}>
-                                                <button
-                                                    style={{
-                                                        ...styles.approveBtn,
-                                                        opacity: application.status === 'READY' ? 1 : 0.6,
-                                                    }}
-                                                    disabled={application.status !== 'READY' || processingApplicationId === application.applicationId}
-                                                    onClick={() => handleApplicationDecision(application.applicationId, 'APPROVED')}
-                                                >
-                                                    승인
-                                                </button>
-                                                <button
-                                                    style={{
-                                                        ...styles.rejectBtn,
-                                                        opacity: application.status === 'READY' ? 1 : 0.6,
-                                                    }}
-                                                    disabled={application.status !== 'READY' || processingApplicationId === application.applicationId}
-                                                    onClick={() => handleApplicationDecision(application.applicationId, 'REJECTED')}
-                                                >
-                                                    거절
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                        {shouldShowManagementUi ? (
+                            <div style={styles.managementSection}>
+                                <div style={styles.sectionHeader}>
+                                    <div>
+                                        <h4 style={styles.sectionTitle}>신청자 관리</h4>
+                                        <p style={styles.sectionDescription}>
+                                            작성자는 신청자 목록을 확인하고 승인 또는 거절을 처리할 수 있습니다.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => void fetchApplications()}
+                                        style={styles.refreshBtn}
+                                        disabled={isApplicationsLoading}
+                                    >
+                                        새로고침
+                                    </button>
                                 </div>
-                            ) : (
-                                <p style={styles.subMessage}>현재 신청자가 없습니다.</p>
-                            )
-                        ) : null}
-                    </div>
-                </div>
-            ) : null}
-        </>
+
+                                {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중...</p> : null}
+                                {applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
+
+                                {!isApplicationsLoading && !applicationsError ? (
+                                    applications.length > 0 ? (
+                                        <div style={styles.applicationList}>
+                                            {applications.map((application) => (
+                                                <div key={application.applicationId} style={styles.applicationCard}>
+                                                    <div style={styles.applicationMeta}>
+                                                        <strong>{application.applicantNickname}</strong>
+                                                        <span>{formatReviewStatus(application.status)}</span>
+                                                    </div>
+                                                    <div style={styles.applicationSubMeta}>
+                                                        <span>ID {application.applicantId}</span>
+                                                        <span>{formatDateTime(application.createdAt)}</span>
+                                                    </div>
+                                                    <div style={styles.actionRow}>
+                                                        <button
+                                                            style={{
+                                                                ...styles.approveBtn,
+                                                                opacity: application.status === 'READY' ? 1 : 0.6,
+                                                            }}
+                                                            disabled={
+                                                                application.status !== 'READY' ||
+                                                                processingApplicationId === application.applicationId
+                                                            }
+                                                            onClick={() => void handleApplicationDecision(application.applicationId, 'APPROVED')}
+                                                        >
+                                                            승인
+                                                        </button>
+                                                        <button
+                                                            style={{
+                                                                ...styles.rejectBtn,
+                                                                opacity: application.status === 'READY' ? 1 : 0.6,
+                                                            }}
+                                                            disabled={
+                                                                application.status !== 'READY' ||
+                                                                processingApplicationId === application.applicationId
+                                                            }
+                                                            onClick={() => void handleApplicationDecision(application.applicationId, 'REJECTED')}
+                                                        >
+                                                            거절
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p style={styles.subMessage}>현재 신청자가 없습니다.</p>
+                                    )
+                                ) : null}
+                            </div>
+                        ) : (
+                            <div style={styles.footer}>
+                                {renderJoinSection()}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div style={styles.emptyState}>{detailError || '정보를 불러오지 못했습니다.'}</div>
+                )}
+            </div>
+        </div>
     );
 };
 
@@ -523,9 +605,9 @@ const styles: { [key: string]: React.CSSProperties } = {
         padding: '20px',
     },
     modal: {
-        backgroundColor: 'white',
+        backgroundColor: '#ffffff',
         width: '100%',
-        maxWidth: '460px',
+        maxWidth: '560px',
         borderRadius: '16px',
         padding: '25px',
         position: 'relative',
@@ -540,10 +622,13 @@ const styles: { [key: string]: React.CSSProperties } = {
         cursor: 'pointer',
         color: '#999',
         padding: '5px',
+        position: 'absolute',
+        top: '18px',
+        right: '18px',
     },
     header: {
         marginBottom: '20px',
-        paddingRight: '20px',
+        paddingRight: '28px',
     },
     title: {
         margin: '0 0 8px 0',
@@ -585,9 +670,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     icon: {
         fontSize: '13px',
-        width: '40px',
+        width: '44px',
         flexShrink: 0,
         color: '#666',
+        fontWeight: 'bold',
+    },
+    primaryText: {
+        fontWeight: 'bold',
+    },
+    highlightText: {
+        color: '#16a34a',
         fontWeight: 'bold',
     },
     contentBox: {
@@ -622,58 +714,42 @@ const styles: { [key: string]: React.CSSProperties } = {
         fontSize: '16px',
         fontWeight: 'bold',
     },
-    manageBtn: {
-        width: '100%',
-        padding: '14px',
-        color: 'white',
-        backgroundColor: '#111827',
-        border: 'none',
-        borderRadius: '10px',
-        fontSize: '16px',
-        fontWeight: 'bold',
-        cursor: 'pointer',
-    },
     applicationHint: {
         margin: '10px 0 0 0',
         fontSize: '13px',
         color: '#64748b',
         textAlign: 'center',
     },
-    emptyState: {
-        padding: '40px',
-        textAlign: 'center',
-        color: '#888',
+    managementSection: {
+        borderTop: '1px solid #e5e7eb',
+        paddingTop: '20px',
     },
-    subOverlay: {
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1100,
-        padding: '20px',
-    },
-    subModal: {
-        width: '100%',
-        maxWidth: '520px',
-        backgroundColor: '#ffffff',
-        borderRadius: '18px',
-        padding: '22px',
-        boxShadow: '0 18px 40px rgba(15,23,42,0.18)',
-        maxHeight: '85vh',
-        overflowY: 'auto',
-    },
-    subHeader: {
+    sectionHeader: {
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '18px',
+        gap: '12px',
+        alignItems: 'flex-start',
+        marginBottom: '14px',
     },
-    subTitle: {
+    sectionTitle: {
         margin: 0,
-        fontSize: '20px',
+        fontSize: '18px',
         color: '#0f172a',
+    },
+    sectionDescription: {
+        margin: '6px 0 0 0',
+        color: '#64748b',
+        fontSize: '13px',
+    },
+    refreshBtn: {
+        border: '1px solid #cbd5e1',
+        backgroundColor: '#ffffff',
+        color: '#334155',
+        borderRadius: '8px',
+        padding: '8px 12px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
     },
     subMessage: {
         margin: 0,
@@ -703,6 +779,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         alignItems: 'center',
         marginBottom: '8px',
         color: '#0f172a',
+        gap: '8px',
     },
     applicationSubMeta: {
         display: 'flex',
@@ -711,6 +788,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         fontSize: '13px',
         color: '#64748b',
         marginBottom: '12px',
+        flexWrap: 'wrap',
     },
     actionRow: {
         display: 'flex',
@@ -735,6 +813,11 @@ const styles: { [key: string]: React.CSSProperties } = {
         backgroundColor: '#dc2626',
         cursor: 'pointer',
         fontWeight: 'bold',
+    },
+    emptyState: {
+        padding: '40px',
+        textAlign: 'center',
+        color: '#888',
     },
 };
 

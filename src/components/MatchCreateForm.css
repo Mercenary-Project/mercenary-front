@@ -1,32 +1,23 @@
-/* 📱 전체 컨테이너: 아이폰 12 Pro 규격 (390px) */
 .mc-container {
     width: 100%;
-    max-width: 390px;
-    margin: 0 auto;
-    background-color: #f5f7fa;
     min-height: 100vh;
+    background-color: #f8fafc;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding-bottom: 50px;
-
-    /* PC 그림자 */
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-    border-left: 1px solid #eee;
-    border-right: 1px solid #eee;
+    padding-bottom: 48px;
 }
 
-/* 헤더 영역 */
 .mc-header {
-    background-color: white;
-    height: 50px;
+    background-color: #ffffff;
+    min-height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
-    border-bottom: 1px solid #ddd;
+    padding: 0 24px;
+    border-bottom: 1px solid #dbe2ea;
     position: sticky;
     top: 0;
     z-index: 100;
-    max-width: 390px;
+    width: min(100%, 960px);
     margin: 0 auto;
 }
 
@@ -35,172 +26,139 @@
     border: none;
     font-size: 22px;
     cursor: pointer;
-    color: #333;
+    color: #334155;
     padding: 0;
     display: flex;
     align-items: center;
 }
 
 .mc-header-title {
-    font-size: 17px;
-    font-weight: 600;
-    color: #333;
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
     margin: 0;
 }
 
-/* 본문 레이아웃 */
 .mc-content {
-    padding: 16px;
+    width: min(100%, 960px);
+    margin: 0 auto;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
 }
 
-/* 카드 스타일 */
 .mc-card {
-    background-color: white;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    border: 1px solid #f0f0f0;
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
 }
 
 .mc-section-title {
     margin-top: 0;
     margin-bottom: 16px;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
-    color: #333;
+    color: #0f172a;
     border-left: 3px solid #4CAF50;
     padding-left: 8px;
 }
 
-/* 입력 폼 공통 */
 .mc-input-group {
     margin-bottom: 12px;
 }
 
 .mc-row {
     display: flex;
-    gap: 10px; /* 간격 살짝 넓힘 */
+    gap: 12px;
 }
 
 .mc-label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
     font-size: 13px;
     font-weight: 600;
-    color: #666;
-    white-space: nowrap; /* ★라벨 줄바꿈 방지 추가★ */
-}
-
-/* 인풋창 스타일 */
-.mc-input {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    font-size: 15px;
-    box-sizing: border-box;
-    outline: none;
-    background-color: #ffffff !important;
-    color: #333333 !important;
-    color-scheme: light;
-    transition: border-color 0.2s;
-    -webkit-appearance: none;
-}
-
-.mc-input:focus {
-    border-color: #4CAF50;
-}
-
-.mc-textarea {
-    width: 100%;
-    height: 100px;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    font-size: 15px;
-    box-sizing: border-box;
-    resize: none;
-    outline: none;
-    font-family: inherit;
-    background-color: #ffffff !important;
-    color: #333333 !important;
-    -webkit-appearance: none;
-}
-
-.mc-textarea:focus {
-    border-color: #4CAF50;
-}
-
-/* 검색바 영역 */
-.mc-search-box {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-
-.mc-search-input {
-    flex: 1;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    font-size: 14px;
-    outline: none;
-    background-color: #ffffff !important;
-    color: #333333 !important;
-    -webkit-appearance: none;
-}
-
-.mc-search-btn {
-    padding: 0 16px;
-    background-color: #333;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
+    color: #475569;
     white-space: nowrap;
 }
 
-/* 지도 영역 */
-.mc-map-area {
-    width: 100%;
-    height: 200px;
-    border-radius: 8px;
-    background-color: #eee;
-    margin-bottom: 12px;
-    border: 1px solid #ddd;
-    overflow: hidden;
-}
-
-/* 위치 결과 박스 */
-.mc-location-result {
-    background-color: #f9f9f9;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #eee;
-}
-
+.mc-input,
+.mc-textarea,
+.mc-search-input,
 .mc-readonly-input {
     width: 100%;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #eee;
-    background-color: #fff;
-    color: #555;
-    font-size: 13px;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    font-size: 15px;
     box-sizing: border-box;
     outline: none;
+    background-color: #ffffff;
+    color: #0f172a;
+    transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-appearance: none;
 }
 
-/* 하단 버튼 */
+.mc-input,
+.mc-search-input,
+.mc-readonly-input {
+    padding: 12px;
+}
+
+.mc-textarea {
+    height: 120px;
+    padding: 12px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.mc-input:focus,
+.mc-textarea:focus,
+.mc-search-input:focus,
+.mc-readonly-input:focus {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+.mc-search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.mc-search-btn {
+    padding: 0 18px;
+    background-color: #334155;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.mc-map-area {
+    width: 100%;
+    height: 320px;
+    border-radius: 12px;
+    background-color: #eee;
+    margin-bottom: 12px;
+    border: 1px solid #dbe2ea;
+    overflow: hidden;
+}
+
+.mc-location-result {
+    background-color: #f8fafc;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
 .mc-submit-btn {
     width: 100%;
-    padding: 15px;
+    padding: 16px;
     background-color: #4CAF50;
     color: white;
     border: none;
@@ -208,12 +166,34 @@
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    margin-top: 10px;
-    margin-bottom: 30px;
+    margin-top: 8px;
+    margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
 .mc-submit-btn:active {
     background-color: #43a047;
     transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+    .mc-header {
+        width: 100%;
+        padding: 0 16px;
+    }
+
+    .mc-content {
+        width: 100%;
+        padding: 16px;
+        gap: 16px;
+    }
+
+    .mc-row,
+    .mc-search-box {
+        flex-direction: column;
+    }
+
+    .mc-map-area {
+        height: 240px;
+    }
 }

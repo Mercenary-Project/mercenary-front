@@ -1,47 +1,237 @@
-// src/pages/Login.tsx
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+const DEV_LOGIN_USERS = [
+    { kakaoId: 1001, nickname: 'test-user-1', label: 'test-user-1 로그인' },
+    { kakaoId: 1002, nickname: 'test-user-2', label: 'test-user-2 로그인' },
+] as const;
+
+const extractAccessToken = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== 'object') {
+        return null;
+    }
+
+    const directToken = (payload as { accessToken?: unknown }).accessToken;
+    if (typeof directToken === 'string' && directToken.length > 0) {
+        return directToken;
+    }
+
+    const data = (payload as { data?: unknown }).data;
+    if (data && typeof data === 'object') {
+        const nestedToken = (data as { accessToken?: unknown }).accessToken;
+        if (typeof nestedToken === 'string' && nestedToken.length > 0) {
+            return nestedToken;
+        }
+    }
+
+    return null;
+};
 
 const Login: React.FC = () => {
-    // 카카오 개발자 센터에서 발급받은 REST API 키
-    const REST_API_KEY = "7d14f9ab2e737ea77a60f2c1bffce860";
-    const REDIRECT_URI = "http://localhost:5173/login/callback";
-    const KAKAO_AUTH_URL = `https://kauth.kakao.com/oauth/authorize?client_id=${REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
+    const navigate = useNavigate();
+    const [isDevLoggingIn, setIsDevLoggingIn] = useState<string | null>(null);
+    const isDevMode = import.meta.env.DEV;
+    const restApiKey = '7d14f9ab2e737ea77a60f2c1bffce860';
+    const redirectUri = 'http://localhost:5173/login/callback';
+    const devLoginEndpoint = import.meta.env.VITE_DEV_LOGIN_ENDPOINT || '/api/auth/dev-login';
+    const kakaoAuthUrl =
+        `https://kauth.kakao.com/oauth/authorize?client_id=${restApiKey}&redirect_uri=${redirectUri}&response_type=code`;
 
     const handleKakaoLogin = () => {
-        window.location.href = KAKAO_AUTH_URL;
+        window.location.href = kakaoAuthUrl;
+    };
+
+    const handleDevLogin = async (user: (typeof DEV_LOGIN_USERS)[number]) => {
+        if (!isDevMode || isDevLoggingIn) {
+            return;
+        }
+
+        setIsDevLoggingIn(user.nickname);
+
+        try {
+            const response = await axios.post(devLoginEndpoint, {
+                kakaoId: user.kakaoId,
+                nickname: user.nickname,
+            });
+            const accessToken = extractAccessToken(response.data);
+
+            if (!accessToken) {
+                throw new Error('dev-login 응답에서 accessToken을 찾지 못했습니다.');
+            }
+
+            localStorage.setItem('accessToken', accessToken);
+            alert(`${user.nickname}로 로그인했습니다.`);
+            navigate('/', { replace: true });
+        } catch (error) {
+            console.error('dev-login failed:', error);
+            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 요청 형식을 확인해주세요.');
+        } finally {
+            setIsDevLoggingIn(null);
+        }
     };
 
     return (
-        <div style={styles.container}>
-            <div style={styles.loginBox}>
-                <h1 style={styles.title}>⚽ Mercenary High</h1>
-                <p style={styles.subtitle}>실시간 용병 매칭 서비스</p>
+        <div style={styles.page}>
+            <div className="page-shell" style={styles.shell}>
+                <div style={styles.loginBox}>
+                    <h1 style={styles.title}>Mercenary High</h1>
+                    <p style={styles.subtitle}>용병 매칭 서비스를 이용하려면 로그인해 주세요.</p>
 
-                <button onClick={handleKakaoLogin} style={styles.kakaoBtn}>
-                    <span style={{ marginRight: '8px' }}>🟡</span>
-                    카카오로 1초 시작하기
-                </button>
+                    <button onClick={handleKakaoLogin} style={styles.kakaoBtn}>
+                        <span style={styles.kakaoIcon}>K</span>
+                        카카오로 시작하기
+                    </button>
+
+                    {isDevMode ? (
+                        <div style={styles.devPanel}>
+                            <div style={styles.devPanelHeader}>
+                                <strong style={styles.devTitle}>개발용 테스트 로그인</strong>
+                                <span style={styles.devBadge}>DEV ONLY</span>
+                            </div>
+                            <p style={styles.devDescription}>
+                                여러 사용자 시점을 확인할 수 있도록 개발 환경에서만 노출됩니다.
+                            </p>
+
+                            <div style={styles.devButtonGroup}>
+                                {DEV_LOGIN_USERS.map((user) => (
+                                    <button
+                                        key={user.nickname}
+                                        type="button"
+                                        style={styles.devLoginBtn}
+                                        onClick={() => void handleDevLogin(user)}
+                                        disabled={isDevLoggingIn !== null}
+                                    >
+                                        {isDevLoggingIn === user.nickname ? '로그인 중...' : user.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <p style={styles.devHint}>
+                                기본 엔드포인트: <code>{devLoginEndpoint}</code>
+                            </p>
+                        </div>
+                    ) : null}
+                </div>
             </div>
         </div>
     );
 };
 
-const styles = {
-    container: {
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        height: '100vh', backgroundColor: '#1E293B',
+const styles: { [key: string]: React.CSSProperties } = {
+    page: {
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #eff6ff 0%, #f8fafc 100%)',
+    },
+    shell: {
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     loginBox: {
-        backgroundColor: '#fff', padding: '40px', borderRadius: '16px',
-        textAlign: 'center' as const, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', width: '320px'
+        width: '100%',
+        maxWidth: '440px',
+        padding: '40px 32px',
+        borderRadius: '20px',
+        backgroundColor: '#ffffff',
+        boxShadow: '0 20px 45px rgba(15, 23, 42, 0.12)',
+        textAlign: 'center',
+        border: '1px solid #dbe2ea',
     },
-    title: { color: '#10B981', margin: '0 0 10px 0' },
-    subtitle: { color: '#64748B', marginBottom: '30px' },
+    title: {
+        margin: '0 0 12px 0',
+        color: '#0f172a',
+        fontSize: '32px',
+        lineHeight: 1.2,
+    },
+    subtitle: {
+        color: '#64748b',
+        margin: '0 0 28px 0',
+        fontSize: '15px',
+    },
     kakaoBtn: {
-        width: '100%', padding: '12px', backgroundColor: '#FEE500',
-        border: 'none', borderRadius: '6px', cursor: 'pointer',
-        fontSize: '16px', fontWeight: 'bold' as const, color: '#3C1E1E'
-    }
+        width: '100%',
+        padding: '14px 16px',
+        backgroundColor: '#FEE500',
+        border: 'none',
+        borderRadius: '12px',
+        cursor: 'pointer',
+        fontSize: '16px',
+        fontWeight: 700,
+        color: '#3C1E1E',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '10px',
+    },
+    kakaoIcon: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '26px',
+        height: '26px',
+        borderRadius: '999px',
+        backgroundColor: 'rgba(60, 30, 30, 0.12)',
+        fontSize: '14px',
+        fontWeight: 800,
+    },
+    devPanel: {
+        marginTop: '20px',
+        padding: '18px',
+        borderRadius: '14px',
+        border: '1px dashed #94a3b8',
+        backgroundColor: '#f8fafc',
+        textAlign: 'left',
+    },
+    devPanelHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '12px',
+    },
+    devTitle: {
+        color: '#0f172a',
+        fontSize: '14px',
+    },
+    devBadge: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4px 8px',
+        borderRadius: '999px',
+        backgroundColor: '#dbeafe',
+        color: '#1d4ed8',
+        fontSize: '11px',
+        fontWeight: 700,
+    },
+    devDescription: {
+        margin: '10px 0 14px 0',
+        color: '#64748b',
+        fontSize: '13px',
+        lineHeight: 1.5,
+    },
+    devButtonGroup: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+    },
+    devLoginBtn: {
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: '10px',
+        border: '1px solid #cbd5e1',
+        backgroundColor: '#ffffff',
+        color: '#0f172a',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: 700,
+    },
+    devHint: {
+        margin: '12px 0 0 0',
+        color: '#64748b',
+        fontSize: '12px',
+    },
 };
 
 export default Login;
