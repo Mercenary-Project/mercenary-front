@@ -1,32 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { extractAccessToken, setAccessToken } from '../utils/auth';
 
 const DEV_LOGIN_USERS = [
     { kakaoId: 1001, nickname: 'test-user-1', label: 'test-user-1 로그인' },
     { kakaoId: 1002, nickname: 'test-user-2', label: 'test-user-2 로그인' },
 ] as const;
-
-const extractAccessToken = (payload: unknown): string | null => {
-    if (!payload || typeof payload !== 'object') {
-        return null;
-    }
-
-    const directToken = (payload as { accessToken?: unknown }).accessToken;
-    if (typeof directToken === 'string' && directToken.length > 0) {
-        return directToken;
-    }
-
-    const data = (payload as { data?: unknown }).data;
-    if (data && typeof data === 'object') {
-        const nestedToken = (data as { accessToken?: unknown }).accessToken;
-        if (typeof nestedToken === 'string' && nestedToken.length > 0) {
-            return nestedToken;
-        }
-    }
-
-    return null;
-};
 
 const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -57,15 +37,15 @@ const Login: React.FC = () => {
             const accessToken = extractAccessToken(response.data);
 
             if (!accessToken) {
-                throw new Error('dev-login 응답에서 accessToken을 찾지 못했습니다.');
+                throw new Error('dev-login response does not include accessToken');
             }
 
-            localStorage.setItem('accessToken', accessToken);
+            setAccessToken(accessToken);
             alert(`${user.nickname}로 로그인했습니다.`);
             navigate('/', { replace: true });
         } catch (error) {
             console.error('dev-login failed:', error);
-            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 요청 형식을 확인해주세요.');
+            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 응답 형식을 확인해 주세요.');
         } finally {
             setIsDevLoggingIn(null);
         }
@@ -108,7 +88,7 @@ const Login: React.FC = () => {
                             </div>
 
                             <p style={styles.devHint}>
-                                기본 엔드포인트: <code>{devLoginEndpoint}</code>
+                                기본 엔드포인트는 <code>{devLoginEndpoint}</code>
                             </p>
                         </div>
                     ) : null}

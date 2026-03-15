@@ -1,31 +1,37 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import MainBoard from './pages/MainBoard';
 import Login from './pages/Login';
 import LoginCallback from './pages/LoginCallback';
 import MatchCreateForm from './pages/MatchCreateForm';
+import MyMatchesPage from './pages/MyMatchesPage';
+import { isAuthenticated as hasAccessToken, subscribeAuthChange } from './utils/auth';
 
 const App: React.FC = () => {
-    // 로컬 스토리지에 토큰이 있는지 확인 (로그인 여부 체크)
-    const isAuthenticated = !!localStorage.getItem('accessToken');
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => hasAccessToken());
+
+    useEffect(() => {
+        const syncAuthState = () => {
+            setIsAuthenticated(hasAccessToken());
+        };
+
+        return subscribeAuthChange(syncAuthState);
+    }, []);
 
     return (
         <Router>
             <Routes>
-                {/* 메인 화면 */}
                 <Route path="/" element={<MainBoard />} />
-
-                {/* 로그인 화면 (이미 로그인했으면 메인으로 튕기기) */}
                 <Route
                     path="/login"
                     element={isAuthenticated ? <Navigate to="/" /> : <Login />}
                 />
                 <Route path="/login/callback" element={<LoginCallback />} />
-
-                {/* 글쓰기 화면 */}
                 <Route path="/match/create" element={<MatchCreateForm />} />
-
-                {/* 이상한 주소로 오면 메인으로 보내기 */}
+                <Route
+                    path="/mypage"
+                    element={isAuthenticated ? <MyMatchesPage /> : <Navigate to="/login" />}
+                />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>
         </Router>

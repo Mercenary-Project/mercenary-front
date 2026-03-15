@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MatchMap from '../components/MatchMap';
 import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
+import { clearAccessToken, isAuthenticated as hasAccessToken, subscribeAuthChange } from '../utils/auth';
 import './MainBoard.css';
 
 declare global {
@@ -26,14 +27,22 @@ interface MatchResponseDto {
 
 const MainBoard: React.FC = () => {
     const navigate = useNavigate();
-    const [isLoggedIn] = useState<boolean>(() => !!localStorage.getItem('accessToken'));
+    const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => hasAccessToken());
     const [matches, setMatches] = useState<Match[]>([]);
     const [keyword, setKeyword] = useState('');
     const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
     const [center, setCenter] = useState<{ lat: number; lng: number }>({
         lat: 37.5665,
-        lng: 126.9780,
+        lng: 126.978,
     });
+
+    useEffect(() => {
+        const syncAuthState = () => {
+            setIsLoggedIn(hasAccessToken());
+        };
+
+        return subscribeAuthChange(syncAuthState);
+    }, []);
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -84,7 +93,7 @@ const MainBoard: React.FC = () => {
 
     const handleSearch = () => {
         if (!keyword.trim()) {
-            alert('지역명을 입력해주세요');
+            alert('지역명을 입력해 주세요.');
             return;
         }
 
@@ -106,8 +115,8 @@ const MainBoard: React.FC = () => {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('accessToken');
-        alert('로그아웃 되었습니다.');
+        clearAccessToken();
+        alert('로그아웃되었습니다.');
         window.location.reload();
     };
 
@@ -117,13 +126,14 @@ const MainBoard: React.FC = () => {
                 <div className="page-shell main-board__header-inner">
                     <div className="main-board__toolbar">
                         <div className="main-board__brand" onClick={() => window.location.reload()}>
-                            <span className="main-board__brand-mark">⚽</span>
+                            <span className="main-board__brand-mark">M</span>
                             <h1 className="main-board__brand-title">Mercenary</h1>
                         </div>
 
                         <div className="main-board__actions">
                             {isLoggedIn ? (
                                 <>
+                                    <button onClick={() => navigate('/mypage')} style={styles.secondaryBtn}>마이페이지</button>
                                     <button onClick={() => navigate('/match/create')} style={styles.primaryBtn}>등록</button>
                                     <button onClick={handleLogout} style={styles.secondaryBtn}>로그아웃</button>
                                 </>
