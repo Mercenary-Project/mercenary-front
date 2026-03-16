@@ -5,6 +5,7 @@ import {
     extractResponseMessage,
     formatDateTime,
     formatReviewStatus,
+    type AppliedMatchSummary,
     type ApplicationSummary,
     type MatchSummary,
 } from '../utils/matchApi';
@@ -14,15 +15,21 @@ type LoadedApplications = Record<number, ApplicationSummary[]>;
 type ApplicationErrors = Record<number, string>;
 type ExpandedMatches = Record<number, boolean>;
 type LoadingMatches = Record<number, boolean>;
+type TabKey = 'authored' | 'applied';
 
 const MY_MATCH_ENDPOINT = '/api/matches/my';
+const MY_APPLIED_MATCH_ENDPOINT = '/api/matches/applied';
+const MAIN_PRIMARY_BUTTON_COLOR = '#4CAF50';
+const MAIN_SECONDARY_BUTTON_COLOR = '#888';
 
 const getMatchId = (match: MatchSummary) => match.matchId ?? match.id ?? 0;
 
 const MyMatchesPage: React.FC = () => {
     const navigate = useNavigate();
     const [token, setToken] = useState<string | null>(() => getAccessToken());
-    const [matches, setMatches] = useState<MatchSummary[]>([]);
+    const [activeTab, setActiveTab] = useState<TabKey>('authored');
+    const [authoredMatches, setAuthoredMatches] = useState<MatchSummary[]>([]);
+    const [appliedMatches, setAppliedMatches] = useState<AppliedMatchSummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [pageError, setPageError] = useState<string | null>(null);
     const [expandedMatches, setExpandedMatches] = useState<ExpandedMatches>({});
@@ -39,7 +46,49 @@ const MyMatchesPage: React.FC = () => {
         return subscribeAuthChange(syncAuthState);
     }, []);
 
-    const fetchMyMatches = useCallback(async () => {
+    const fetchAuthoredMatches = useCallback(async () => {
+        if (!token) {
+            navigate('/login', { replace: true });
+            return;
+        }
+
+        const response = await fetch(MY_MATCH_ENDPOINT, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(extractResponseMessage(payload, '내가 작성한 게시글을 불러오지 못했습니다.'));
+        }
+
+        const data = extractResponseData<MatchSummary[]>(payload);
+        setAuthoredMatches(Array.isArray(data) ? data : []);
+    }, [navigate, token]);
+
+    const fetchAppliedMatches = useCallback(async () => {
+        if (!token) {
+            navigate('/login', { replace: true });
+            return;
+        }
+
+        const response = await fetch(MY_APPLIED_MATCH_ENDPOINT, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(extractResponseMessage(payload, '내 신청 목록을 불러오지 못했습니다.'));
+        }
+
+        const data = extractResponseData<AppliedMatchSummary[]>(payload);
+        setAppliedMatches(Array.isArray(data) ? data : []);
+    }, [navigate, token]);
+
+    const refreshActiveTab = useCallback(async () => {
         if (!token) {
             navigate('/login', { replace: true });
             return;
@@ -49,27 +98,18 @@ const MyMatchesPage: React.FC = () => {
         setPageError(null);
 
         try {
-            const response = await fetch(MY_MATCH_ENDPOINT, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                throw new Error(extractResponseMessage(payload, '내가 작성한 게시글을 불러오지 못했습니다.'));
+            if (activeTab === 'authored') {
+                await fetchAuthoredMatches();
+            } else {
+                await fetchAppliedMatches();
             }
-
-            const data = extractResponseData<MatchSummary[]>(payload);
-            setMatches(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error(error);
-            setPageError(error instanceof Error ? error.message : '내가 작성한 게시글을 불러오지 못했습니다.');
-            setMatches([]);
+            setPageError(error instanceof Error ? error.message : '마이페이지 정보를 불러오지 못했습니다.');
         } finally {
             setIsLoading(false);
         }
-    }, [navigate, token]);
+    }, [activeTab, fetchAppliedMatches, fetchAuthoredMatches, navigate, token]);
 
     const fetchApplications = useCallback(async (matchId: number) => {
         if (!token || loadingByMatch[matchId]) {
@@ -108,8 +148,8 @@ const MyMatchesPage: React.FC = () => {
     }, [loadingByMatch, token]);
 
     useEffect(() => {
-        void fetchMyMatches();
-    }, [fetchMyMatches]);
+        void refreshActiveTab();
+    }, [refreshActiveTab]);
 
     const handleToggleApplications = (matchId: number) => {
         const nextExpanded = !expandedMatches[matchId];
@@ -129,7 +169,7 @@ const MyMatchesPage: React.FC = () => {
             return;
         }
 
-        setProcessingKey(`${matchId}-${applicationId}`);
+        setProcessingKey(`decision-${matchId}-${applicationId}`);
 
         try {
             const response = await fetch(`/api/matches/${matchId}/applications/${applicationId}`, {
@@ -155,19 +195,265 @@ const MyMatchesPage: React.FC = () => {
         }
     };
 
+    const handleCancelMyApplication = async (matchId: number) => {
+        if (!token || processingKey) {
+            return;
+        }
+
+        setProcessingKey(`cancel-${matchId}`);
+
+        try {
+            const response = await fetch(`/api/matches/${matchId}/application/me`, {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(extractResponseMessage(payload, '신청 취소에 실패했습니다.'));
+            }
+
+            await fetchAppliedMatches();
+        } catch (error) {
+            console.error(error);
+            alert(error instanceof Error ? error.message : '신청 취소 중 오류가 발생했습니다.');
+        } finally {
+            setProcessingKey(null);
+        }
+    };
+
+    const handleDeleteMatch = async (matchId: number, title: string) => {
+        if (!token || processingKey) {
+            return;
+        }
+
+        const shouldDelete = window.confirm(`'${title}' 매치를 삭제하시겠습니까?`);
+
+        if (!shouldDelete) {
+            return;
+        }
+
+        setProcessingKey(`delete-${matchId}`);
+
+        try {
+            const response = await fetch(`/api/matches/${matchId}`, {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(extractResponseMessage(payload, '매치 삭제에 실패했습니다.'));
+            }
+
+            setAuthoredMatches((prev) => prev.filter((match) => getMatchId(match) !== matchId));
+            setExpandedMatches((prev) => {
+                const next = { ...prev };
+                delete next[matchId];
+                return next;
+            });
+            setApplicationsByMatch((prev) => {
+                const next = { ...prev };
+                delete next[matchId];
+                return next;
+            });
+            setLoadingByMatch((prev) => {
+                const next = { ...prev };
+                delete next[matchId];
+                return next;
+            });
+            setErrorByMatch((prev) => {
+                const next = { ...prev };
+                delete next[matchId];
+                return next;
+            });
+
+            alert('매치가 성공적으로 삭제되었습니다.');
+        } catch (error) {
+            console.error(error);
+            alert(error instanceof Error ? error.message : '매치 삭제 중 오류가 발생했습니다.');
+        } finally {
+            setProcessingKey(null);
+        }
+    };
+
+    const renderAuthoredMatches = () => {
+        if (authoredMatches.length === 0) {
+            return <div style={styles.emptyBox}>작성한 게시글이 아직 없습니다.</div>;
+        }
+
+        return (
+            <div style={styles.matchList}>
+                {authoredMatches.map((match) => {
+                    const matchId = getMatchId(match);
+                    const applications = applicationsByMatch[matchId] ?? [];
+                    const isExpanded = Boolean(expandedMatches[matchId]);
+                    const isApplicationsLoading = Boolean(loadingByMatch[matchId]);
+                    const applicationsError = errorByMatch[matchId];
+                    const isDeleting = processingKey === `delete-${matchId}`;
+
+                    return (
+                        <article key={matchId} style={styles.matchCard}>
+                            <div style={styles.matchHeader}>
+                                <div style={styles.matchMeta}>
+                                    <h2 style={styles.matchTitle}>{match.title}</h2>
+                                    <div style={styles.matchSubText}>
+                                        <span>{match.placeName || '장소 미정'}</span>
+                                        <span>{formatDateTime(match.matchDate)}</span>
+                                        <span>
+                                            {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style={styles.matchActionGroup}>
+                                    <button
+                                        type="button"
+                                        style={styles.secondaryButton}
+                                        onClick={() => navigate(`/match/${matchId}/edit`)}
+                                        disabled={Boolean(processingKey)}
+                                    >
+                                        수정
+                                    </button>
+                                    <button
+                                        type="button"
+                                        style={isDeleting ? styles.disabledButton : styles.dangerButton}
+                                        onClick={() => void handleDeleteMatch(matchId, match.title)}
+                                        disabled={Boolean(processingKey)}
+                                    >
+                                        {isDeleting ? '삭제 중...' : '삭제'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        style={styles.primaryButton}
+                                        onClick={() => handleToggleApplications(matchId)}
+                                        disabled={isDeleting}
+                                    >
+                                        {isExpanded ? '신청자 닫기' : '신청자 보기'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {match.content ? <p style={styles.matchContent}>{match.content}</p> : null}
+
+                            {isExpanded ? (
+                                <section style={styles.applicationSection}>
+                                    {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중입니다.</p> : null}
+                                    {!isApplicationsLoading && applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
+                                    {!isApplicationsLoading && !applicationsError && applications.length === 0 ? (
+                                        <p style={styles.subMessage}>아직 신청한 사람이 없습니다.</p>
+                                    ) : null}
+                                    {!isApplicationsLoading && !applicationsError && applications.length > 0 ? (
+                                        <div style={styles.applicationList}>
+                                            {applications.map((application) => {
+                                                const isProcessing = processingKey === `decision-${matchId}-${application.applicationId}`;
+                                                const canReview = application.status === 'READY' && !isProcessing;
+
+                                                return (
+                                                    <div key={application.applicationId} style={styles.applicationCard}>
+                                                        <div style={styles.applicationTopRow}>
+                                                            <strong>{application.applicantNickname}</strong>
+                                                            <span>{formatReviewStatus(application.status)}</span>
+                                                        </div>
+                                                        <div style={styles.applicationSubRow}>
+                                                            <span>ID {application.applicantId}</span>
+                                                            <span>{formatDateTime(application.createdAt)}</span>
+                                                        </div>
+                                                        <div style={styles.actionRow}>
+                                                            <button
+                                                                type="button"
+                                                                style={styles.approveButton}
+                                                                disabled={!canReview}
+                                                                onClick={() => void handleApplicationDecision(matchId, application.applicationId, 'APPROVED')}
+                                                            >
+                                                                승인
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                style={styles.rejectButton}
+                                                                disabled={!canReview}
+                                                                onClick={() => void handleApplicationDecision(matchId, application.applicationId, 'REJECTED')}
+                                                            >
+                                                                거절
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null}
+                                </section>
+                            ) : null}
+                        </article>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const renderAppliedMatches = () => {
+        if (appliedMatches.length === 0) {
+            return <div style={styles.emptyBox}>신청한 게시글이 아직 없습니다.</div>;
+        }
+
+        return (
+            <div style={styles.matchList}>
+                {appliedMatches.map((match) => {
+                    const canCancel = match.status === 'READY';
+                    const isProcessing = processingKey === `cancel-${match.matchId}`;
+
+                    return (
+                        <article key={match.applicationId} style={styles.matchCard}>
+                            <div style={styles.matchHeader}>
+                                <div style={styles.matchMeta}>
+                                    <h2 style={styles.matchTitle}>{match.title}</h2>
+                                    <div style={styles.matchSubText}>
+                                        <span>{match.placeName || '장소 미정'}</span>
+                                        <span>{formatDateTime(match.matchDate)}</span>
+                                        <span>작성자 {match.writerName || '-'}</span>
+                                        <span>
+                                            {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
+                                        </span>
+                                    </div>
+                                </div>
+                                <span style={canCancel ? styles.badgeReady : styles.badgeDone}>
+                                    {formatReviewStatus(match.status)}
+                                </span>
+                            </div>
+
+                            <div style={styles.appliedActionRow}>
+                                <button
+                                    type="button"
+                                    style={canCancel ? styles.secondaryButton : styles.disabledButton}
+                                    disabled={!canCancel || isProcessing}
+                                    onClick={() => void handleCancelMyApplication(match.matchId)}
+                                >
+                                    {isProcessing ? '취소 중...' : '신청 취소'}
+                                </button>
+                            </div>
+                        </article>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <div style={styles.page}>
             <header style={styles.header}>
                 <div className="page-shell" style={styles.headerInner}>
                     <div>
-                        <h1 style={styles.title}>내 게시글 관리</h1>
-                        <p style={styles.subtitle}>내가 올린 게시글과 신청자 목록을 한 화면에서 확인합니다.</p>
+                        <h1 style={styles.title}>마이페이지</h1>
+                        <p style={styles.subtitle}>내가 작성한 글과 신청한 글을 한 화면에서 관리합니다.</p>
                     </div>
                     <div style={styles.headerActions}>
                         <button type="button" style={styles.secondaryButton} onClick={() => navigate('/')}>
                             메인으로
                         </button>
-                        <button type="button" style={styles.primaryButton} onClick={() => void fetchMyMatches()}>
+                        <button type="button" style={styles.primaryButton} onClick={() => void refreshActiveTab()}>
                             새로고침
                         </button>
                     </div>
@@ -175,97 +461,27 @@ const MyMatchesPage: React.FC = () => {
             </header>
 
             <main className="page-shell" style={styles.content}>
-                {isLoading ? <div style={styles.emptyBox}>내 게시글을 불러오는 중입니다.</div> : null}
+                <div style={styles.tabRow}>
+                    <button
+                        type="button"
+                        style={activeTab === 'authored' ? styles.activeTabButton : styles.tabButton}
+                        onClick={() => setActiveTab('authored')}
+                    >
+                        내가 작성한 글
+                    </button>
+                    <button
+                        type="button"
+                        style={activeTab === 'applied' ? styles.activeTabButton : styles.tabButton}
+                        onClick={() => setActiveTab('applied')}
+                    >
+                        내가 신청한 글
+                    </button>
+                </div>
+
+                {isLoading ? <div style={styles.emptyBox}>마이페이지 정보를 불러오는 중입니다.</div> : null}
                 {!isLoading && pageError ? <div style={styles.errorBox}>{pageError}</div> : null}
-                {!isLoading && !pageError && matches.length === 0 ? (
-                    <div style={styles.emptyBox}>작성한 게시글이 아직 없습니다.</div>
-                ) : null}
-
-                {!isLoading && !pageError && matches.length > 0 ? (
-                    <div style={styles.matchList}>
-                        {matches.map((match) => {
-                            const matchId = getMatchId(match);
-                            const applications = applicationsByMatch[matchId] ?? [];
-                            const isExpanded = Boolean(expandedMatches[matchId]);
-                            const isApplicationsLoading = Boolean(loadingByMatch[matchId]);
-                            const applicationsError = errorByMatch[matchId];
-
-                            return (
-                                <article key={matchId} style={styles.matchCard}>
-                                    <div style={styles.matchHeader}>
-                                        <div style={styles.matchMeta}>
-                                            <h2 style={styles.matchTitle}>{match.title}</h2>
-                                            <div style={styles.matchSubText}>
-                                                <span>{match.placeName || '장소 미정'}</span>
-                                                <span>{formatDateTime(match.matchDate)}</span>
-                                                <span>
-                                                    {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            style={styles.primaryButton}
-                                            onClick={() => handleToggleApplications(matchId)}
-                                        >
-                                            {isExpanded ? '신청자 닫기' : '신청자 보기'}
-                                        </button>
-                                    </div>
-
-                                    {match.content ? <p style={styles.matchContent}>{match.content}</p> : null}
-
-                                    {isExpanded ? (
-                                        <section style={styles.applicationSection}>
-                                            {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중입니다.</p> : null}
-                                            {!isApplicationsLoading && applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
-                                            {!isApplicationsLoading && !applicationsError && applications.length === 0 ? (
-                                                <p style={styles.subMessage}>아직 신청한 사람이 없습니다.</p>
-                                            ) : null}
-                                            {!isApplicationsLoading && !applicationsError && applications.length > 0 ? (
-                                                <div style={styles.applicationList}>
-                                                    {applications.map((application) => {
-                                                        const isProcessing = processingKey === `${matchId}-${application.applicationId}`;
-                                                        const canReview = application.status === 'READY' && !isProcessing;
-
-                                                        return (
-                                                            <div key={application.applicationId} style={styles.applicationCard}>
-                                                                <div style={styles.applicationTopRow}>
-                                                                    <strong>{application.applicantNickname}</strong>
-                                                                    <span>{formatReviewStatus(application.status)}</span>
-                                                                </div>
-                                                                <div style={styles.applicationSubRow}>
-                                                                    <span>ID {application.applicantId}</span>
-                                                                    <span>{formatDateTime(application.createdAt)}</span>
-                                                                </div>
-                                                                <div style={styles.actionRow}>
-                                                                    <button
-                                                                        type="button"
-                                                                        style={styles.approveButton}
-                                                                        disabled={!canReview}
-                                                                        onClick={() => void handleApplicationDecision(matchId, application.applicationId, 'APPROVED')}
-                                                                    >
-                                                                        승인
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        style={styles.rejectButton}
-                                                                        disabled={!canReview}
-                                                                        onClick={() => void handleApplicationDecision(matchId, application.applicationId, 'REJECTED')}
-                                                                    >
-                                                                        거절
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ) : null}
-                                        </section>
-                                    ) : null}
-                                </article>
-                            );
-                        })}
-                    </div>
+                {!isLoading && !pageError ? (
+                    activeTab === 'authored' ? renderAuthoredMatches() : renderAppliedMatches()
                 ) : null}
             </main>
         </div>
@@ -306,6 +522,30 @@ const styles: { [key: string]: React.CSSProperties } = {
     content: {
         paddingTop: '24px',
         paddingBottom: '40px',
+    },
+    tabRow: {
+        display: 'flex',
+        gap: '10px',
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+    },
+    tabButton: {
+        padding: '12px 16px',
+        backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
+        border: 'none',
+        borderRadius: '12px',
+        color: '#ffffff',
+        cursor: 'pointer',
+        fontWeight: 700,
+    },
+    activeTabButton: {
+        padding: '12px 16px',
+        backgroundColor: MAIN_PRIMARY_BUTTON_COLOR,
+        border: 'none',
+        borderRadius: '12px',
+        color: '#ffffff',
+        cursor: 'pointer',
+        fontWeight: 700,
     },
     matchList: {
         display: 'flex',
@@ -388,9 +628,19 @@ const styles: { [key: string]: React.CSSProperties } = {
         gap: '10px',
         marginTop: '12px',
     },
+    appliedActionRow: {
+        marginTop: '16px',
+        display: 'flex',
+        justifyContent: 'flex-end',
+    },
+    matchActionGroup: {
+        display: 'flex',
+        gap: '10px',
+        flexWrap: 'wrap',
+    },
     primaryButton: {
         padding: '10px 16px',
-        backgroundColor: '#2563eb',
+        backgroundColor: MAIN_PRIMARY_BUTTON_COLOR,
         color: '#ffffff',
         border: 'none',
         borderRadius: '10px',
@@ -400,11 +650,21 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     secondaryButton: {
         padding: '10px 16px',
-        backgroundColor: '#ffffff',
-        color: '#334155',
-        border: '1px solid #cbd5e1',
+        backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
+        color: '#ffffff',
+        border: 'none',
         borderRadius: '10px',
         cursor: 'pointer',
+        fontWeight: 700,
+        whiteSpace: 'nowrap',
+    },
+    disabledButton: {
+        padding: '10px 16px',
+        backgroundColor: '#b5b5b5',
+        color: '#f8fafc',
+        border: 'none',
+        borderRadius: '10px',
+        cursor: 'not-allowed',
         fontWeight: 700,
         whiteSpace: 'nowrap',
     },
@@ -413,7 +673,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         padding: '10px 12px',
         border: 'none',
         borderRadius: '10px',
-        backgroundColor: '#16a34a',
+        backgroundColor: MAIN_PRIMARY_BUTTON_COLOR,
         color: '#ffffff',
         cursor: 'pointer',
         fontWeight: 700,
@@ -423,10 +683,42 @@ const styles: { [key: string]: React.CSSProperties } = {
         padding: '10px 12px',
         border: 'none',
         borderRadius: '10px',
+        backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
+        color: '#ffffff',
+        cursor: 'pointer',
+        fontWeight: 700,
+    },
+    dangerButton: {
+        padding: '10px 16px',
+        border: 'none',
+        borderRadius: '10px',
         backgroundColor: '#dc2626',
         color: '#ffffff',
         cursor: 'pointer',
         fontWeight: 700,
+        whiteSpace: 'nowrap',
+    },
+    badgeReady: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '6px 10px',
+        borderRadius: '999px',
+        backgroundColor: '#dbeafe',
+        color: '#1d4ed8',
+        fontWeight: 700,
+        fontSize: '12px',
+    },
+    badgeDone: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '6px 10px',
+        borderRadius: '999px',
+        backgroundColor: '#e2e8f0',
+        color: '#475569',
+        fontWeight: 700,
+        fontSize: '12px',
     },
     emptyBox: {
         borderRadius: '18px',
