@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { extractAccessToken, setAccessToken } from '../utils/auth';
+import { buildApiUrl } from '../utils/api';
 
 const LoginCallback: React.FC = () => {
     const navigate = useNavigate();
@@ -19,7 +20,7 @@ const LoginCallback: React.FC = () => {
 
         const login = async () => {
             try {
-                const response = await axios.post('/api/auth/kakao', { code });
+                const response = await axios.post(buildApiUrl('/api/auth/kakao'), { code });
                 const accessToken = extractAccessToken(response.data);
 
                 if (!accessToken) {

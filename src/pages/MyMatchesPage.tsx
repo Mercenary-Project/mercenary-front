@@ -9,6 +9,7 @@ import {
     type ApplicationSummary,
     type MatchSummary,
 } from '../utils/matchApi';
+import { buildApiUrl } from '../utils/api';
 import { getAccessToken, subscribeAuthChange } from '../utils/auth';
 
 type LoadedApplications = Record<number, ApplicationSummary[]>;
@@ -17,8 +18,8 @@ type ExpandedMatches = Record<number, boolean>;
 type LoadingMatches = Record<number, boolean>;
 type TabKey = 'authored' | 'applied';
 
-const MY_MATCH_ENDPOINT = '/api/matches/my';
-const MY_APPLIED_MATCH_ENDPOINT = '/api/matches/applied';
+const MY_MATCH_ENDPOINT = buildApiUrl('/api/matches/my');
+const MY_APPLIED_MATCH_ENDPOINT = buildApiUrl('/api/matches/applied');
 const MAIN_PRIMARY_BUTTON_COLOR = '#4CAF50';
 const MAIN_SECONDARY_BUTTON_COLOR = '#888';
 
@@ -60,7 +61,7 @@ const MyMatchesPage: React.FC = () => {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-            throw new Error(extractResponseMessage(payload, '내가 작성한 게시글을 불러오지 못했습니다.'));
+            throw new Error(extractResponseMessage(payload, '작성한 게시글을 불러오지 못했습니다.'));
         }
 
         const data = extractResponseData<MatchSummary[]>(payload);
@@ -81,7 +82,7 @@ const MyMatchesPage: React.FC = () => {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
-            throw new Error(extractResponseMessage(payload, '내 신청 목록을 불러오지 못했습니다.'));
+            throw new Error(extractResponseMessage(payload, '신청한 게시글을 불러오지 못했습니다.'));
         }
 
         const data = extractResponseData<AppliedMatchSummary[]>(payload);
@@ -120,7 +121,7 @@ const MyMatchesPage: React.FC = () => {
         setErrorByMatch((prev) => ({ ...prev, [matchId]: '' }));
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/applications`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications`), {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -172,7 +173,7 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`decision-${matchId}-${applicationId}`);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/applications/${applicationId}`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
                 method: 'PATCH',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -203,7 +204,7 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`cancel-${matchId}`);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/application/me`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/application/me`), {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -238,7 +239,7 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`delete-${matchId}`);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -304,9 +305,7 @@ const MyMatchesPage: React.FC = () => {
                                     <div style={styles.matchSubText}>
                                         <span>{match.placeName || '장소 미정'}</span>
                                         <span>{formatDateTime(match.matchDate)}</span>
-                                        <span>
-                                            {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
-                                        </span>
+                                        <span>{match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명</span>
                                     </div>
                                 </div>
                                 <div style={styles.matchActionGroup}>
@@ -414,9 +413,7 @@ const MyMatchesPage: React.FC = () => {
                                         <span>{match.placeName || '장소 미정'}</span>
                                         <span>{formatDateTime(match.matchDate)}</span>
                                         <span>작성자 {match.writerName || '-'}</span>
-                                        <span>
-                                            {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
-                                        </span>
+                                        <span>{match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명</span>
                                     </div>
                                 </div>
                                 <span style={canCancel ? styles.badgeReady : styles.badgeDone}>

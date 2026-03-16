@@ -27,7 +27,10 @@ const App: React.FC = () => {
                     element={isAuthenticated ? <Navigate to="/" /> : <Login />}
                 />
                 <Route path="/login/callback" element={<LoginCallback />} />
-                <Route path="/match/create" element={<MatchCreateForm />} />
+                <Route
+                    path="/match/create"
+                    element={isAuthenticated ? <MatchCreateForm /> : <Navigate to="/login" />}
+                />
                 <Route
                     path="/match/:matchId/edit"
                     element={isAuthenticated ? <MatchCreateForm /> : <Navigate to="/login" />}

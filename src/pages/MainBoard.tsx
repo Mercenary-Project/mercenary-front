@@ -4,6 +4,7 @@ import MatchMap from '../components/MatchMap';
 import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
 import { clearAccessToken, isAuthenticated as hasAccessToken, subscribeAuthChange } from '../utils/auth';
+import { buildApiUrl } from '../utils/api';
 import './MainBoard.css';
 
 declare global {
@@ -19,6 +20,8 @@ interface MatchResponseDto {
     title: string;
     content?: string;
     placeName?: string;
+    currentPlayerCount?: number;
+    maxPlayerCount?: number;
     latitude: number;
     longitude: number;
     matchDate: string;
@@ -61,11 +64,11 @@ const MainBoard: React.FC = () => {
         const fetchMatches = async () => {
             try {
                 const response = await fetch(
-                    `/api/matches/nearby?latitude=${center.lat}&longitude=${center.lng}&distance=5.0`,
+                    buildApiUrl(`/api/matches/nearby?latitude=${center.lat}&longitude=${center.lng}&distance=5.0`),
                 );
 
                 if (!response.ok) {
-                    throw new Error('서버 응답 실패');
+                    throw new Error('서버 응답에 실패했습니다.');
                 }
 
                 const jsonResponse = await response.json();
@@ -79,11 +82,13 @@ const MainBoard: React.FC = () => {
                     longitude: item.longitude,
                     matchDate: item.matchDate,
                     distance: item.distance,
+                    currentPlayerCount: item.currentPlayerCount,
+                    maxPlayerCount: item.maxPlayerCount,
                 }));
 
                 setMatches(parsedData);
             } catch (error) {
-                console.error('매치 로딩 실패:', error);
+                console.error('매치 목록을 불러오지 못했습니다.', error);
                 setMatches([]);
             }
         };
@@ -93,11 +98,11 @@ const MainBoard: React.FC = () => {
 
     const handleSearch = () => {
         if (!keyword.trim()) {
-            alert('지역명을 입력해 주세요.');
+            alert('검색어를 입력해 주세요.');
             return;
         }
 
-        if (!window.kakao || !window.kakao.maps || !window.kakao.maps.services) {
+        if (!window.kakao?.maps?.services) {
             return;
         }
 
@@ -106,7 +111,7 @@ const MainBoard: React.FC = () => {
         places.keywordSearch(keyword, (data: any, status: any) => {
             if (status === window.kakao.maps.services.Status.OK) {
                 const target = data[0];
-                setCenter({ lat: parseFloat(target.y), lng: parseFloat(target.x) });
+                setCenter({ lat: Number.parseFloat(target.y), lng: Number.parseFloat(target.x) });
                 return;
             }
 
@@ -126,15 +131,14 @@ const MainBoard: React.FC = () => {
                 <div className="page-shell main-board__header-inner">
                     <div className="main-board__toolbar">
                         <div className="main-board__brand" onClick={() => window.location.reload()}>
-                            <span className="main-board__brand-mark">M</span>
                             <h1 className="main-board__brand-title">Mercenary</h1>
                         </div>
 
                         <div className="main-board__actions">
                             {isLoggedIn ? (
                                 <>
-                                    <button onClick={() => navigate('/mypage')} style={styles.secondaryBtn}>마이페이지</button>
                                     <button onClick={() => navigate('/match/create')} style={styles.primaryBtn}>등록</button>
+                                    <button onClick={() => navigate('/mypage')} style={styles.secondaryBtn}>마이페이지</button>
                                     <button onClick={handleLogout} style={styles.secondaryBtn}>로그아웃</button>
                                 </>
                             ) : (
@@ -146,7 +150,7 @@ const MainBoard: React.FC = () => {
                     <div className="main-board__search">
                         <input
                             type="text"
-                            placeholder="지역 검색 (예: 강남역)"
+                            placeholder="지역 검색 예: 강남역"
                             className="main-board__search-input"
                             value={keyword}
                             onChange={(event) => setKeyword(event.target.value)}
@@ -182,6 +186,9 @@ const MainBoard: React.FC = () => {
                                     onClick={() => setSelectedMatchId(match.matchId || 0)}
                                 >
                                     <h4 style={styles.cardTitle}>{match.title || match.placeName}</h4>
+                                    <p style={styles.cardMeta}>
+                                        인원 {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
+                                    </p>
                                     <p style={styles.cardPlace}>장소 {match.placeName}</p>
                                 </div>
                             ))
@@ -240,6 +247,12 @@ const styles: { [key: string]: React.CSSProperties } = {
         margin: 0,
         fontSize: '13px',
         color: '#64748b',
+    },
+    cardMeta: {
+        margin: '4px 0 0 0',
+        fontSize: '13px',
+        color: '#334155',
+        fontWeight: 600,
     },
 };
 

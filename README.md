@@ -76,6 +76,19 @@ npm run build
 VITE_DEV_LOGIN_ENDPOINT=/api/auth/dev-login
 ```
 
+배포 환경에서는 프론트가 직접 호출할 API 베이스 주소를 지정할 수 있습니다.
+
+```bash
+VITE_API_BASE_URL=https://api.example.com
+VITE_DEV_LOGIN_ENDPOINT=/api/auth/dev-login
+```
+
+개발 환경에서 Vite 프록시 대상을 바꾸려면 아래 값을 사용할 수 있습니다.
+
+```bash
+VITE_API_PROXY_TARGET=http://127.0.0.1:8080
+```
+
 ## 주요 기능
 
 ### 메인 보드

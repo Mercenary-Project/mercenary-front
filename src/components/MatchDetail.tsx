@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { buildApiUrl } from '../utils/api';
 
 interface ApiResponse {
     code?: number;
@@ -18,7 +19,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId, onApplySuccess }) =>
         const token = localStorage.getItem('accessToken');
 
         if (!token) {
-            setStatusMessage('로그인 후 신청할 수 있습니다.');
+            setStatusMessage('로그인해야 신청할 수 있습니다.');
             return;
         }
 
@@ -26,7 +27,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId, onApplySuccess }) =>
         setStatusMessage('신청 처리 중...');
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/apply`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/apply`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -36,7 +37,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId, onApplySuccess }) =>
             const jsonResponse: ApiResponse | null = await response.json().catch(() => null);
 
             if (response.ok) {
-                setStatusMessage(jsonResponse?.message || '신청 성공!');
+                setStatusMessage(jsonResponse?.message || '신청이 완료되었습니다.');
                 onApplySuccess();
             } else {
                 setStatusMessage(`신청 실패: ${jsonResponse?.message || '알 수 없는 오류'}`);
@@ -50,7 +51,15 @@ const MatchDetail: React.FC<MatchDetailProps> = ({ matchId, onApplySuccess }) =>
     };
 
     return (
-        <div style={{ padding: '20px', border: '2px solid #007bff', borderRadius: '8px', marginTop: '20px', backgroundColor: '#f0f8ff' }}>
+        <div
+            style={{
+                padding: '20px',
+                border: '2px solid #007bff',
+                borderRadius: '8px',
+                marginTop: '20px',
+                backgroundColor: '#f0f8ff',
+            }}
+        >
             <h3>매치 신청 테스트</h3>
             <p>
                 아래 버튼을 누르면 <strong>{matchId}번 매치</strong>에 참가 신청을 시도합니다.

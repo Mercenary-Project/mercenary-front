@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '../components/MatchCreateForm.css';
 import { extractResponseData, extractResponseMessage, formatDateTimeLocalValue, type MatchSummary } from '../utils/matchApi';
+import { buildApiUrl } from '../utils/api';
 import { getAccessToken } from '../utils/auth';
 
 declare global {
@@ -39,7 +40,6 @@ const MatchCreateForm: React.FC = () => {
     const navigate = useNavigate();
     const { matchId } = useParams<{ matchId?: string }>();
     const mapContainer = useRef<HTMLDivElement>(null);
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mapRef = useRef<any>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,7 +138,7 @@ const MatchCreateForm: React.FC = () => {
             setIsLoading(true);
 
             try {
-                const response = await fetch(`/api/matches/${numericMatchId}`);
+                const response = await fetch(buildApiUrl(`/api/matches/${numericMatchId}`));
                 const payload = await response.json().catch(() => null);
 
                 if (!response.ok) {
@@ -238,7 +238,9 @@ const MatchCreateForm: React.FC = () => {
         };
 
         try {
-            const endpoint = isEditMode && numericMatchId ? `/api/matches/${numericMatchId}` : '/api/matches';
+            const endpoint = isEditMode && numericMatchId
+                ? buildApiUrl(`/api/matches/${numericMatchId}`)
+                : buildApiUrl('/api/matches');
             const method = isEditMode ? 'PATCH' : 'POST';
             const response = await fetch(endpoint, {
                 method,
@@ -293,7 +295,7 @@ const MatchCreateForm: React.FC = () => {
                         <input
                             type="text"
                             className="mc-input"
-                            placeholder="예: 이번 주 토요일 6vs6 매치"
+                            placeholder="예: 이번 주 수요일 6vs6 매치"
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
                         />

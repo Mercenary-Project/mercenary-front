@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildApiUrl } from '../utils/api';
 
 interface MatchDetailModalProps {
     matchId: number;
@@ -206,7 +207,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         setDetailError(null);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}`);
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}`));
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
@@ -237,7 +238,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         setIsStatusLoading(true);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/application/me`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/application/me`), {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -251,7 +252,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(extractResponseMessage(payload, '내 신청 상태를 불러오지 못했습니다.'));
+                throw new Error(extractResponseMessage(payload, '신청 상태를 불러오지 못했습니다.'));
             }
 
             setMyApplication(normalizeMyApplicationStatus(extractResponseData(payload)));
@@ -275,7 +276,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         setApplicationsError(null);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/applications`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications`), {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -357,7 +358,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         setIsApplying(true);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/apply`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/apply`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -390,7 +391,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         setProcessingApplicationId(applicationId);
 
         try {
-            const response = await fetch(`/api/matches/${matchId}/applications/${applicationId}`, {
+            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
                 method: 'PATCH',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -514,7 +515,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                                     <div>
                                         <h4 style={styles.sectionTitle}>신청자 관리</h4>
                                         <p style={styles.sectionDescription}>
-                                            작성자는 신청자 목록을 확인하고 승인 또는 거절을 처리할 수 있습니다.
+                                            작성자는 신청자 목록을 확인하고 승인 또는 거절 처리를 할 수 있습니다.
                                         </p>
                                     </div>
                                     <button
@@ -526,7 +527,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                                     </button>
                                 </div>
 
-                                {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중...</p> : null}
+                                {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중입니다.</p> : null}
                                 {applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
 
                                 {!isApplicationsLoading && !applicationsError ? (

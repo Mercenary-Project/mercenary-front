@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { extractAccessToken, setAccessToken } from '../utils/auth';
+import { DEV_LOGIN_ENDPOINT } from '../utils/api';
 
 const DEV_LOGIN_USERS = [
     { kakaoId: 1001, nickname: 'test-user-1', label: 'test-user-1 로그인' },
@@ -14,7 +15,6 @@ const Login: React.FC = () => {
     const isDevMode = import.meta.env.DEV;
     const restApiKey = '7d14f9ab2e737ea77a60f2c1bffce860';
     const redirectUri = 'http://localhost:5173/login/callback';
-    const devLoginEndpoint = import.meta.env.VITE_DEV_LOGIN_ENDPOINT || '/api/auth/dev-login';
     const kakaoAuthUrl =
         `https://kauth.kakao.com/oauth/authorize?client_id=${restApiKey}&redirect_uri=${redirectUri}&response_type=code`;
 
@@ -30,7 +30,7 @@ const Login: React.FC = () => {
         setIsDevLoggingIn(user.nickname);
 
         try {
-            const response = await axios.post(devLoginEndpoint, {
+            const response = await axios.post(DEV_LOGIN_ENDPOINT, {
                 kakaoId: user.kakaoId,
                 nickname: user.nickname,
             });
@@ -70,7 +70,7 @@ const Login: React.FC = () => {
                                 <span style={styles.devBadge}>DEV ONLY</span>
                             </div>
                             <p style={styles.devDescription}>
-                                여러 사용자 시점을 확인할 수 있도록 개발 환경에서만 노출됩니다.
+                                여러 사용자 시점을 빠르게 확인할 수 있도록 개발 환경에서만 노출됩니다.
                             </p>
 
                             <div style={styles.devButtonGroup}>
@@ -88,7 +88,7 @@ const Login: React.FC = () => {
                             </div>
 
                             <p style={styles.devHint}>
-                                기본 엔드포인트는 <code>{devLoginEndpoint}</code>
+                                기본 엔드포인트는 <code>{DEV_LOGIN_ENDPOINT}</code>
                             </p>
                         </div>
                     ) : null}
