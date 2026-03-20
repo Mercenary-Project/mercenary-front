@@ -31,6 +31,7 @@ const MatchMap: React.FC<MatchMapProps> = ({ matches, center, onMarkerClick }) =
     const mapRef = useRef<any>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const markersRef = useRef<any[]>([]);
+    const initialCenterRef = useRef(center);
 
     useEffect(() => {
         if (!window.kakao || !mapContainer.current || mapRef.current) {
@@ -38,7 +39,10 @@ const MatchMap: React.FC<MatchMapProps> = ({ matches, center, onMarkerClick }) =
         }
 
         const options = {
-            center: new window.kakao.maps.LatLng(center?.lat || 37.498095, center?.lng || 127.02761),
+            center: new window.kakao.maps.LatLng(
+                initialCenterRef.current?.lat || 37.498095,
+                initialCenterRef.current?.lng || 127.02761,
+            ),
             level: 5,
         };
 

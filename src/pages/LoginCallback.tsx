@@ -2,25 +2,57 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { extractAccessToken, setAccessToken } from '../utils/auth';
-import { buildApiUrl } from '../utils/api';
+import { KAKAO_CODE_EXCHANGE_ENDPOINT } from '../utils/api';
+
+const getHashParams = () => new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+const getFirstParam = (searchParams: URLSearchParams, hashParams: URLSearchParams, keys: string[]) => {
+    for (const key of keys) {
+        const value = searchParams.get(key) ?? hashParams.get(key);
+
+        if (value) {
+            return value;
+        }
+    }
+
+    return null;
+};
 
 const LoginCallback: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const hasFetched = useRef(false);
+    const hasHandled = useRef(false);
 
     useEffect(() => {
-        const code = searchParams.get('code');
-
-        if (!code || hasFetched.current) {
+        if (hasHandled.current) {
             return;
         }
 
-        hasFetched.current = true;
+        hasHandled.current = true;
 
-        const login = async () => {
+        const hashParams = getHashParams();
+        const authError = getFirstParam(searchParams, hashParams, ['error_description', 'error']);
+        const directAccessToken = getFirstParam(searchParams, hashParams, ['accessToken', 'token']);
+        const code = getFirstParam(searchParams, hashParams, ['code']);
+
+        const handleCallback = async () => {
             try {
-                const response = await axios.post(buildApiUrl('/api/auth/kakao'), { code });
+                if (authError) {
+                    throw new Error(authError);
+                }
+
+                if (directAccessToken) {
+                    setAccessToken(directAccessToken);
+                    alert('로그인에 성공했습니다.');
+                    navigate('/', { replace: true });
+                    return;
+                }
+
+                if (!code) {
+                    throw new Error('로그인에 필요한 인증 정보가 없습니다.');
+                }
+
+                const response = await axios.post(KAKAO_CODE_EXCHANGE_ENDPOINT, { code });
                 const accessToken = extractAccessToken(response.data);
 
                 if (!accessToken) {
@@ -32,12 +64,12 @@ const LoginCallback: React.FC = () => {
                 navigate('/', { replace: true });
             } catch (error) {
                 console.error('login callback failed:', error);
-                alert('로그인 처리에 실패했습니다. 백엔드 응답 형식을 확인해 주세요.');
+                alert(error instanceof Error ? error.message : '로그인 처리에 실패했습니다. 백엔드 응답을 확인해주세요.');
                 navigate('/login', { replace: true });
             }
         };
 
-        void login();
+        void handleCallback();
     }, [navigate, searchParams]);
 
     return (

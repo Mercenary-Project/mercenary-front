@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { extractAccessToken, setAccessToken } from '../utils/auth';
-import { DEV_LOGIN_ENDPOINT } from '../utils/api';
+import { DEV_LOGIN_ENDPOINT, KAKAO_LOGIN_URL } from '../utils/api';
 
 const DEV_LOGIN_USERS = [
     { kakaoId: 1001, nickname: 'test-user-1', label: 'test-user-1 로그인' },
@@ -13,13 +13,15 @@ const Login: React.FC = () => {
     const navigate = useNavigate();
     const [isDevLoggingIn, setIsDevLoggingIn] = useState<string | null>(null);
     const isDevMode = import.meta.env.DEV;
-    const restApiKey = '7d14f9ab2e737ea77a60f2c1bffce860';
-    const redirectUri = 'http://localhost:5173/login/callback';
-    const kakaoAuthUrl =
-        `https://kauth.kakao.com/oauth/authorize?client_id=${restApiKey}&redirect_uri=${redirectUri}&response_type=code`;
+    const isKakaoLoginReady = KAKAO_LOGIN_URL.length > 0;
 
     const handleKakaoLogin = () => {
-        window.location.href = kakaoAuthUrl;
+        if (!isKakaoLoginReady) {
+            alert('카카오 로그인 URL이 설정되지 않았습니다. 배포 환경 변수를 확인해주세요.');
+            return;
+        }
+
+        window.location.assign(KAKAO_LOGIN_URL);
     };
 
     const handleDevLogin = async (user: (typeof DEV_LOGIN_USERS)[number]) => {
@@ -41,11 +43,11 @@ const Login: React.FC = () => {
             }
 
             setAccessToken(accessToken);
-            alert(`${user.nickname}로 로그인했습니다.`);
+            alert(`${user.nickname} 계정으로 로그인했습니다.`);
             navigate('/', { replace: true });
         } catch (error) {
             console.error('dev-login failed:', error);
-            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 응답 형식을 확인해 주세요.');
+            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 응답 형식을 확인해주세요.');
         } finally {
             setIsDevLoggingIn(null);
         }
@@ -58,10 +60,26 @@ const Login: React.FC = () => {
                     <h1 style={styles.title}>Mercenary High</h1>
                     <p style={styles.subtitle}>용병 매칭 서비스를 이용하려면 로그인해 주세요.</p>
 
-                    <button onClick={handleKakaoLogin} style={styles.kakaoBtn}>
+                    <button
+                        type="button"
+                        onClick={handleKakaoLogin}
+                        style={{
+                            ...styles.kakaoBtn,
+                            opacity: isKakaoLoginReady ? 1 : 0.55,
+                            cursor: isKakaoLoginReady ? 'pointer' : 'not-allowed',
+                        }}
+                        disabled={!isKakaoLoginReady}
+                    >
                         <span style={styles.kakaoIcon}>K</span>
                         카카오로 시작하기
                     </button>
+
+                    {!isKakaoLoginReady ? (
+                        <p style={styles.warningText}>
+                            `VITE_KAKAO_LOGIN_URL` 또는 `VITE_KAKAO_REST_API_KEY` / `VITE_KAKAO_REDIRECT_URI`
+                            설정이 필요합니다.
+                        </p>
+                    ) : null}
 
                     {isDevMode ? (
                         <div style={styles.devPanel}>
@@ -89,6 +107,9 @@ const Login: React.FC = () => {
 
                             <p style={styles.devHint}>
                                 기본 엔드포인트는 <code>{DEV_LOGIN_ENDPOINT}</code>
+                            </p>
+                            <p style={styles.devHint}>
+                                카카오 로그인 시작 URL은 <code>{KAKAO_LOGIN_URL || '미설정'}</code>
                             </p>
                         </div>
                     ) : null}
@@ -136,7 +157,6 @@ const styles: { [key: string]: React.CSSProperties } = {
         backgroundColor: '#FEE500',
         border: 'none',
         borderRadius: '12px',
-        cursor: 'pointer',
         fontSize: '16px',
         fontWeight: 700,
         color: '#3C1E1E',
@@ -155,6 +175,13 @@ const styles: { [key: string]: React.CSSProperties } = {
         backgroundColor: 'rgba(60, 30, 30, 0.12)',
         fontSize: '14px',
         fontWeight: 800,
+    },
+    warningText: {
+        margin: '12px 0 0 0',
+        color: '#b45309',
+        fontSize: '13px',
+        lineHeight: 1.5,
+        textAlign: 'left',
     },
     devPanel: {
         marginTop: '20px',
@@ -211,6 +238,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         margin: '12px 0 0 0',
         color: '#64748b',
         fontSize: '12px',
+        lineHeight: 1.5,
     },
 };
 
