@@ -79,6 +79,7 @@ export const formatDateTime = (value: string) => {
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Asia/Seoul',
     });
 };
 
@@ -93,14 +94,32 @@ export const formatDateTimeLocalValue = (value: string) => {
         return normalized;
     }
 
-    const date = new Date(normalized);
+    const normalizedWithT = normalized.replace(' ', 'T');
+    const match = normalizedWithT.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
 
-    if (Number.isNaN(date.getTime())) {
-        return normalized.slice(0, 16);
+    if (match) {
+        return match[1];
     }
 
-    const timezoneOffset = date.getTimezoneOffset() * 60_000;
-    return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+    return normalizedWithT.slice(0, 16);
+};
+
+export const isPastMatch = (matchDate: string) => {
+    const date = new Date(matchDate);
+
+    if (Number.isNaN(date.getTime())) {
+        return false;
+    }
+
+    return date.getTime() < Date.now();
+};
+
+export const isMatchFull = (currentPlayerCount?: number, maxPlayerCount?: number) => {
+    if (typeof currentPlayerCount !== 'number' || typeof maxPlayerCount !== 'number') {
+        return false;
+    }
+
+    return currentPlayerCount >= maxPlayerCount;
 };
 
 export const formatReviewStatus = (status: ApplicationDecisionStatus) => {

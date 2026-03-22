@@ -1,5 +1,6 @@
 const ACCESS_TOKEN_KEY = 'accessToken';
 const AUTH_CHANGED_EVENT = 'auth-changed';
+const AUTH_EXPIRED_REDIRECT_FLAG = 'auth-expired-redirecting';
 
 const normalizeToken = (value: string | null) => {
     if (!value) {
@@ -36,6 +37,52 @@ export const setAccessToken = (token: string) => {
 export const clearAccessToken = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     dispatchAuthChanged();
+};
+
+const extractPayloadMessage = (payload: unknown) => {
+    if (payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string') {
+        return payload.message;
+    }
+
+    return '';
+};
+
+const isExpiredTokenMessage = (message: string) => {
+    const normalized = message.trim().toLowerCase();
+
+    if (!normalized) {
+        return false;
+    }
+
+    return (
+        (normalized.includes('token') || normalized.includes('토큰') || normalized.includes('jwt')) &&
+        (normalized.includes('expired') || normalized.includes('expire') || normalized.includes('만료'))
+    );
+};
+
+export const handleExpiredToken = (payload?: unknown) => {
+    const message = extractPayloadMessage(payload);
+
+    if (!isExpiredTokenMessage(message)) {
+        return false;
+    }
+
+    clearAccessToken();
+
+    if (typeof window !== 'undefined') {
+        const isRedirecting = sessionStorage.getItem(AUTH_EXPIRED_REDIRECT_FLAG) === 'true';
+
+        if (!isRedirecting) {
+            sessionStorage.setItem(AUTH_EXPIRED_REDIRECT_FLAG, 'true');
+            window.alert('로그인이 만료되었습니다. 다시 로그인해 주세요.');
+            window.location.replace('/login');
+            window.setTimeout(() => {
+                sessionStorage.removeItem(AUTH_EXPIRED_REDIRECT_FLAG);
+            }, 1000);
+        }
+    }
+
+    return true;
 };
 
 export const subscribeAuthChange = (listener: () => void) => {

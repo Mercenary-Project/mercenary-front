@@ -5,9 +5,37 @@ import { extractAccessToken, setAccessToken } from '../utils/auth';
 import { DEV_LOGIN_ENDPOINT, KAKAO_LOGIN_URL } from '../utils/api';
 
 const DEV_LOGIN_USERS = [
-    { kakaoId: 1001, nickname: 'test-user-1', label: 'test-user-1 로그인' },
-    { kakaoId: 1002, nickname: 'test-user-2', label: 'test-user-2 로그인' },
+    { kakaoId: 1001, nickname: 'test-user-1', label: '테스트 계정 1로 로그인' },
+    { kakaoId: 1002, nickname: 'test-user-2', label: '테스트 계정 2로 로그인' },
 ] as const;
+
+const getAxiosErrorMessage = (error: unknown, fallback: string) => {
+    if (!axios.isAxiosError(error)) {
+        return fallback;
+    }
+
+    const responseMessage =
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        'message' in error.response.data &&
+        typeof error.response.data.message === 'string'
+            ? error.response.data.message
+            : '';
+
+    if (responseMessage) {
+        return responseMessage;
+    }
+
+    if (error.response?.status === 403) {
+        return '백엔드에서 403을 반환했습니다. dev-login 활성화 여부 또는 카카오 설정 값을 확인해 주세요.';
+    }
+
+    if (error.code === 'ERR_NETWORK') {
+        return '네트워크 요청에 실패했습니다. 프록시 또는 백엔드 서버 상태를 확인해 주세요.';
+    }
+
+    return fallback;
+};
 
 const Login: React.FC = () => {
     const navigate = useNavigate();
@@ -17,7 +45,7 @@ const Login: React.FC = () => {
 
     const handleKakaoLogin = () => {
         if (!isKakaoLoginReady) {
-            alert('카카오 로그인 URL이 설정되지 않았습니다. 배포 환경 변수를 확인해주세요.');
+            alert('카카오 로그인 환경변수가 없습니다. VITE_KAKAO_REST_API_KEY, VITE_KAKAO_REDIRECT_URI 값을 확인해 주세요.');
             return;
         }
 
@@ -39,7 +67,7 @@ const Login: React.FC = () => {
             const accessToken = extractAccessToken(response.data);
 
             if (!accessToken) {
-                throw new Error('dev-login response does not include accessToken');
+                throw new Error('dev-login 응답에 accessToken이 없습니다.');
             }
 
             setAccessToken(accessToken);
@@ -47,7 +75,7 @@ const Login: React.FC = () => {
             navigate('/', { replace: true });
         } catch (error) {
             console.error('dev-login failed:', error);
-            alert('개발용 로그인에 실패했습니다. 백엔드 dev-login 응답 형식을 확인해주세요.');
+            alert(getAxiosErrorMessage(error, '개발용 테스트 로그인에 실패했습니다.'));
         } finally {
             setIsDevLoggingIn(null);
         }
@@ -58,7 +86,7 @@ const Login: React.FC = () => {
             <div className="page-shell" style={styles.shell}>
                 <div style={styles.loginBox}>
                     <h1 style={styles.title}>Mercenary High</h1>
-                    <p style={styles.subtitle}>용병 매칭 서비스를 이용하려면 로그인해 주세요.</p>
+                    <p style={styles.subtitle}>로컬 테스트용 로그인 방식을 선택해 주세요.</p>
 
                     <button
                         type="button"
@@ -88,7 +116,7 @@ const Login: React.FC = () => {
                                 <span style={styles.devBadge}>DEV ONLY</span>
                             </div>
                             <p style={styles.devDescription}>
-                                여러 사용자 시점을 빠르게 확인할 수 있도록 개발 환경에서만 노출됩니다.
+                                로컬에서 카카오 로그인이 불안정하면 아래 테스트 계정으로 바로 로그인할 수 있습니다.
                             </p>
 
                             <div style={styles.devButtonGroup}>
@@ -106,10 +134,10 @@ const Login: React.FC = () => {
                             </div>
 
                             <p style={styles.devHint}>
-                                기본 엔드포인트는 <code>{DEV_LOGIN_ENDPOINT}</code>
+                                개발용 로그인 엔드포인트: <code>{DEV_LOGIN_ENDPOINT}</code>
                             </p>
                             <p style={styles.devHint}>
-                                카카오 로그인 시작 URL은 <code>{KAKAO_LOGIN_URL || '미설정'}</code>
+                                카카오 인증 URL: <code>{KAKAO_LOGIN_URL || '미설정'}</code>
                             </p>
                         </div>
                     ) : null}
@@ -239,6 +267,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         color: '#64748b',
         fontSize: '12px',
         lineHeight: 1.5,
+        wordBreak: 'break-all',
     },
 };
 

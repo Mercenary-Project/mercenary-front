@@ -18,6 +18,34 @@ const getFirstParam = (searchParams: URLSearchParams, hashParams: URLSearchParam
     return null;
 };
 
+const getAxiosErrorMessage = (error: unknown, fallback: string) => {
+    if (!axios.isAxiosError(error)) {
+        return fallback;
+    }
+
+    const responseMessage =
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        'message' in error.response.data &&
+        typeof error.response.data.message === 'string'
+            ? error.response.data.message
+            : '';
+
+    if (responseMessage) {
+        return responseMessage;
+    }
+
+    if (error.response?.status === 403) {
+        return '백엔드에서 403을 반환했습니다. 카카오 client_id 또는 redirect_uri 설정 불일치를 확인해 주세요.';
+    }
+
+    if (error.code === 'ERR_NETWORK') {
+        return '네트워크 오류가 발생했습니다. 프록시 또는 백엔드 서버 상태를 확인해 주세요.';
+    }
+
+    return fallback;
+};
+
 const LoginCallback: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -56,7 +84,7 @@ const LoginCallback: React.FC = () => {
                 const accessToken = extractAccessToken(response.data);
 
                 if (!accessToken) {
-                    throw new Error('kakao login response does not include accessToken');
+                    throw new Error('카카오 로그인 응답에 accessToken이 없습니다.');
                 }
 
                 setAccessToken(accessToken);
@@ -64,7 +92,7 @@ const LoginCallback: React.FC = () => {
                 navigate('/', { replace: true });
             } catch (error) {
                 console.error('login callback failed:', error);
-                alert(error instanceof Error ? error.message : '로그인 처리에 실패했습니다. 백엔드 응답을 확인해주세요.');
+                alert(getAxiosErrorMessage(error, '로그인 처리에 실패했습니다. 백엔드 응답을 확인해 주세요.'));
                 navigate('/login', { replace: true });
             }
         };

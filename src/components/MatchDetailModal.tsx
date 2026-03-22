@@ -1,10 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildApiUrl } from '../utils/api';
+import {
+    extractResponseData,
+    extractResponseMessage,
+    formatDateTime,
+    formatReviewStatus,
+    isMatchFull,
+    isPastMatch,
+    type ApplicationDecisionStatus,
+} from '../utils/matchApi';
+import { getAccessToken } from '../utils/auth';
 
 interface MatchDetailModalProps {
     matchId: number;
     onClose: () => void;
+    onMissingMatch?: (matchId: number) => void;
 }
 
 interface MatchDetailDto {
@@ -22,8 +33,6 @@ interface MatchDetailDto {
     status?: string;
 }
 
-type ApplicationDecisionStatus = 'READY' | 'APPROVED' | 'REJECTED';
-
 type MyApplicationStatus = {
     applied: boolean;
     status: ApplicationDecisionStatus | null;
@@ -37,12 +46,6 @@ type ApplicationSummary = {
     status: ApplicationDecisionStatus;
     createdAt: string;
 };
-
-interface ApiEnvelope<T> {
-    code?: string | number;
-    message?: string;
-    data?: T | null;
-}
 
 interface TokenClaims {
     userId?: number;
@@ -82,26 +85,6 @@ const decodeAccessToken = (token: string | null): TokenClaims | null => {
     }
 };
 
-const extractResponseData = <T,>(payload: ApiEnvelope<T> | T | null): T | null => {
-    if (!payload) {
-        return null;
-    }
-
-    if (typeof payload === 'object' && 'data' in (payload as ApiEnvelope<T>)) {
-        return ((payload as ApiEnvelope<T>).data ?? null) as T | null;
-    }
-
-    return payload as T;
-};
-
-const extractResponseMessage = (payload: unknown, fallback: string) => {
-    if (payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string') {
-        return payload.message;
-    }
-
-    return fallback;
-};
-
 const normalizeMyApplicationStatus = (data: unknown): MyApplicationStatus => {
     if (!data || typeof data !== 'object') {
         return DEFAULT_APPLICATION_STATUS;
@@ -127,42 +110,16 @@ const formatApplicationStatus = (status: MyApplicationStatus['status']) => {
             return '승인 완료';
         case 'REJECTED':
             return '거절됨';
+        case 'CANCELED':
+            return '신청 취소';
         default:
             return '신청하기';
     }
 };
 
-const formatReviewStatus = (status: ApplicationSummary['status']) => {
-    switch (status) {
-        case 'READY':
-            return '대기 중';
-        case 'APPROVED':
-            return '승인 완료';
-        case 'REJECTED':
-            return '거절됨';
-        default:
-            return status;
-    }
-};
-
-const formatDateTime = (value: string) => {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return '-';
-    }
-
-    return date.toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-};
-
-const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose }) => {
+const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, onMissingMatch }) => {
     const navigate = useNavigate();
+    const missingMatchHandledRef = useRef(false);
     const [match, setMatch] = useState<MatchDetailDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [detailError, setDetailError] = useState<string | null>(null);
@@ -175,7 +132,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
     const [processingApplicationId, setProcessingApplicationId] = useState<number | null>(null);
     const [canManageApplications, setCanManageApplications] = useState(false);
 
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     const claims = decodeAccessToken(token);
     const currentUserId =
         claims?.userId ??
@@ -190,9 +147,23 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             (currentNickname && (currentNickname === match.writerNickname || currentNickname === match.writerName))
         )
     );
+    const isPastDue = match ? isPastMatch(match.matchDate) : false;
+    const isFull = match ? isMatchFull(match.currentPlayerCount, match.maxPlayerCount) : false;
     const isClosed = match?.status === 'CLOSED';
+    const isJoinBlockedByMatchState = isClosed || isPastDue || isFull;
     const shouldShowManagementUi = isAuthorByPayload || canManageApplications;
-    const isJoinDisabled = !token || isApplying || isStatusLoading || myApplication.applied || isClosed;
+    const isJoinDisabled = !token || isApplying || isStatusLoading || myApplication.applied || isJoinBlockedByMatchState;
+
+    const handleMissingMatch = useCallback(() => {
+        if (missingMatchHandledRef.current) {
+            return;
+        }
+
+        missingMatchHandledRef.current = true;
+        alert('삭제되었거나 만료된 게시글입니다.');
+        onMissingMatch?.(matchId);
+        onClose();
+    }, [matchId, onClose, onMissingMatch]);
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -211,23 +182,25 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(extractResponseMessage(payload, '매치 상세 정보를 불러오지 못했습니다.'));
+                throw new Error(extractResponseMessage(payload, 'Failed to load match detail.'));
             }
 
             const data = extractResponseData<MatchDetailDto>(payload);
 
             if (!data) {
-                throw new Error('매치 상세 정보가 비어 있습니다.');
+                throw new Error('Match detail is empty.');
             }
 
             setMatch(data);
         } catch (error) {
             console.error(error);
-            setDetailError(error instanceof Error ? error.message : '매치 상세 정보를 불러오지 못했습니다.');
+            setMatch(null);
+            setDetailError(error instanceof Error ? error.message : 'Failed to load match detail.');
+            handleMissingMatch();
         } finally {
             setLoading(false);
         }
-    }, [matchId]);
+    }, [handleMissingMatch, matchId]);
 
     const fetchMyApplicationStatus = useCallback(async () => {
         if (!token) {
@@ -252,7 +225,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(extractResponseMessage(payload, '신청 상태를 불러오지 못했습니다.'));
+                throw new Error(extractResponseMessage(payload, 'Failed to load application status.'));
             }
 
             setMyApplication(normalizeMyApplicationStatus(extractResponseData(payload)));
@@ -290,7 +263,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                     return false;
                 }
 
-                throw new Error(extractResponseMessage(payload, '신청자 목록을 불러오지 못했습니다.'));
+                throw new Error(extractResponseMessage(payload, 'Failed to load applications.'));
             }
 
             const data = extractResponseData<ApplicationSummary[]>(payload);
@@ -301,7 +274,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             console.error(error);
             setApplications([]);
             setCanManageApplications(false);
-            setApplicationsError(error instanceof Error ? error.message : '신청자 목록을 불러오지 못했습니다.');
+            setApplicationsError(error instanceof Error ? error.message : 'Failed to load applications.');
             return false;
         } finally {
             setIsApplicationsLoading(false);
@@ -342,7 +315,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
     };
 
     const handleJoin = async () => {
-        if (!match || isApplying || myApplication.applied || isClosed) {
+        if (!match || isApplying || myApplication.applied || isJoinBlockedByMatchState) {
             return;
         }
 
@@ -351,7 +324,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
             return;
         }
 
-        if (!window.confirm(`'${match.title}' 매치에 참가 신청하시겠습니까?`)) {
+        if (!window.confirm(`'${match.title}' 경기에 신청하시겠습니까?`)) {
             return;
         }
 
@@ -414,50 +387,29 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
         }
     };
 
-    if (loading) {
+    if (loading || !match) {
         return null;
     }
 
-    const renderJoinSection = () => {
-        if (!token) {
-            return (
-                <>
-                    <button
-                        onClick={handleLoginRedirect}
-                        style={{ ...styles.joinBtn, backgroundColor: '#2563eb', cursor: 'pointer' }}
-                    >
-                        로그인 후 신청하기
-                    </button>
-                    <p style={styles.applicationHint}>비로그인 상태에서는 로그인 후 신청할 수 있습니다.</p>
-                </>
-            );
-        }
+    const joinButtonLabel = isPastDue
+        ? '지난 경기'
+        : isFull
+            ? '정원 마감'
+            : isClosed
+                ? '모집 마감'
+                : isStatusLoading
+                    ? '신청 상태 확인 중...'
+                    : isApplying
+                        ? '신청 처리 중...'
+                        : formatApplicationStatus(myApplication.status);
 
-        return (
-            <>
-                <button
-                    onClick={handleJoin}
-                    style={{
-                        ...styles.joinBtn,
-                        backgroundColor: myApplication.applied || isClosed ? '#94a3b8' : isApplying ? '#93c5fd' : '#2563eb',
-                        cursor: isJoinDisabled ? 'not-allowed' : 'pointer',
-                    }}
-                    disabled={isJoinDisabled}
-                >
-                    {isClosed
-                        ? '모집 마감'
-                        : isStatusLoading
-                            ? '신청 상태 확인 중...'
-                            : isApplying
-                                ? '신청 처리 중...'
-                                : formatApplicationStatus(myApplication.status)}
-                </button>
-                {myApplication.applied ? (
-                    <p style={styles.applicationHint}>현재 상태: {formatApplicationStatus(myApplication.status)}</p>
-                ) : null}
-            </>
-        );
-    };
+    const joinHint = myApplication.applied
+        ? `현재 상태: ${formatApplicationStatus(myApplication.status)}`
+        : isPastDue
+            ? '지난 경기는 신청할 수 없습니다.'
+            : isFull
+                ? '정원이 마감된 경기는 신청할 수 없습니다.'
+                : null;
 
     return (
         <div style={styles.overlay} onClick={onClose}>
@@ -466,12 +418,12 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                     X
                 </button>
 
-                {match && !detailError ? (
+                {!detailError ? (
                     <>
                         <div style={styles.header}>
                             <h2 style={styles.title}>{match.title}</h2>
-                            <span style={isClosed ? styles.badgeClosed : styles.badgeOpen}>
-                                {isClosed ? '모집 마감' : '모집 중'}
+                            <span style={isJoinBlockedByMatchState ? styles.badgeClosed : styles.badgeOpen}>
+                                {isPastDue ? '지난 경기' : isJoinBlockedByMatchState ? '모집 마감' : '모집 중'}
                             </span>
                         </div>
 
@@ -515,7 +467,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                                     <div>
                                         <h4 style={styles.sectionTitle}>신청자 관리</h4>
                                         <p style={styles.sectionDescription}>
-                                            작성자는 신청자 목록을 확인하고 승인 또는 거절 처리를 할 수 있습니다.
+                                            신청 목록을 확인하고 승인 또는 거절 처리할 수 있습니다.
                                         </p>
                                     </div>
                                     <button
@@ -527,7 +479,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                                     </button>
                                 </div>
 
-                                {isApplicationsLoading ? <p style={styles.subMessage}>신청자 목록을 불러오는 중입니다.</p> : null}
+                                {isApplicationsLoading ? <p style={styles.subMessage}>신청 목록을 불러오는 중입니다.</p> : null}
                                 {applicationsError ? <p style={styles.errorText}>{applicationsError}</p> : null}
 
                                 {!isApplicationsLoading && !applicationsError ? (
@@ -581,12 +533,37 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose })
                             </div>
                         ) : (
                             <div style={styles.footer}>
-                                {renderJoinSection()}
+                                {!token ? (
+                                    <>
+                                        <button
+                                            onClick={handleLoginRedirect}
+                                            style={{ ...styles.joinBtn, backgroundColor: '#2563eb', cursor: 'pointer' }}
+                                        >
+                                            로그인 후 신청하기
+                                        </button>
+                                        <p style={styles.applicationHint}>비로그인 상태에서는 로그인 후 신청할 수 있습니다.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={handleJoin}
+                                            style={{
+                                                ...styles.joinBtn,
+                                                backgroundColor: myApplication.applied || isJoinBlockedByMatchState ? '#94a3b8' : isApplying ? '#93c5fd' : '#2563eb',
+                                                cursor: isJoinDisabled ? 'not-allowed' : 'pointer',
+                                            }}
+                                            disabled={isJoinDisabled}
+                                        >
+                                            {joinButtonLabel}
+                                        </button>
+                                        {joinHint ? <p style={styles.applicationHint}>{joinHint}</p> : null}
+                                    </>
+                                )}
                             </div>
                         )}
                     </>
                 ) : (
-                    <div style={styles.emptyState}>{detailError || '정보를 불러오지 못했습니다.'}</div>
+                    <div style={styles.emptyState}>{detailError}</div>
                 )}
             </div>
         </div>
@@ -694,7 +671,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         margin: '0 0 8px 0',
         fontSize: '13px',
         color: '#888',
-        fontWeight: '600',
+        fontWeight: 600,
     },
     contentText: {
         margin: 0,
@@ -709,7 +686,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     joinBtn: {
         width: '100%',
         padding: '14px',
-        color: 'white',
+        color: '#ffffff',
         border: 'none',
         borderRadius: '10px',
         fontSize: '16px',
@@ -800,7 +777,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         border: 'none',
         borderRadius: '8px',
         padding: '10px 12px',
-        color: '#fff',
+        color: '#ffffff',
         backgroundColor: '#16a34a',
         cursor: 'pointer',
         fontWeight: 'bold',
@@ -810,7 +787,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         border: 'none',
         borderRadius: '8px',
         padding: '10px 12px',
-        color: '#fff',
+        color: '#ffffff',
         backgroundColor: '#dc2626',
         cursor: 'pointer',
         fontWeight: 'bold',
