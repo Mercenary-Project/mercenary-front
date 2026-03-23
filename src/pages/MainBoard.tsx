@@ -5,6 +5,7 @@ import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
 import { clearAccessToken, isAuthenticated as hasAccessToken, subscribeAuthChange } from '../utils/auth';
 import { buildApiUrl } from '../utils/api';
+import { isPastMatch } from '../utils/matchApi';
 import './MainBoard.css';
 
 declare global {
@@ -74,7 +75,7 @@ const MainBoard: React.FC = () => {
                 const jsonResponse = await response.json();
                 const result = (jsonResponse.data ?? []) as MatchResponseDto[];
 
-                const parsedData: Match[] = result.map((item) => ({
+                const parsedData: Match[] = result.filter((item) => !isPastMatch(item.matchDate)).map((item) => ({
                     matchId: item.matchId || item.id || 0,
                     title: item.title,
                     placeName: item.placeName || '장소 정보 없음',
@@ -201,6 +202,9 @@ const MainBoard: React.FC = () => {
                 <MatchDetailModal
                     matchId={selectedMatchId}
                     onClose={() => setSelectedMatchId(null)}
+                    onMissingMatch={(missingMatchId) => {
+                        setMatches((prev) => prev.filter((match) => match.matchId !== missingMatchId));
+                    }}
                 />
             )}
         </div>
