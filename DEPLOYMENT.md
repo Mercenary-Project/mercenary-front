@@ -98,6 +98,45 @@ Then on the server:
 cp -r ~/dist/* /var/www/mercenary-front/
 ```
 
+## 5.8 GitHub Actions Automatic Deployment
+
+This repository now includes a GitHub Actions workflow:
+
+- `.github/workflows/deploy.yml`
+
+Deployment flow:
+
+1. Push to `main`
+2. GitHub Actions runs `npm ci`
+3. GitHub Actions runs `npm run lint`
+4. GitHub Actions runs `npm run build`
+5. The built `dist/` folder is uploaded to the Lightsail server
+6. The server replaces `/var/www/mercenary-front` contents
+7. `Nginx` config is tested and reloaded
+
+Required GitHub repository secrets:
+
+```bash
+LIGHTSAIL_HOST=3.38.35.241
+LIGHTSAIL_USER=ubuntu
+LIGHTSAIL_SSH_KEY=<Lightsail PEM private key content>
+
+VITE_API_BASE_URL=http://3.38.35.241:8080
+VITE_API_PROXY_TARGET=http://3.38.35.241:8080
+VITE_DEV_LOGIN_ENDPOINT=/api/auth/dev-login
+VITE_KAKAO_CODE_EXCHANGE_ENDPOINT=/api/auth/kakao
+VITE_KAKAO_REST_API_KEY=7d14f9ab2e737ea77a60f2c1bffce860
+VITE_KAKAO_REDIRECT_URI=http://3.38.35.241/login/callback
+```
+
+Notes:
+
+- `LIGHTSAIL_SSH_KEY` should be the full text content of the `.pem` file, not the file path.
+- The server must already have `Nginx` installed and configured.
+- The `ubuntu` user must be able to write to `/var/www/mercenary-front`.
+- If `sudo systemctl reload nginx` requires a password, configure passwordless sudo for that command first.
+- When the final domain is fixed, update the `VITE_KAKAO_REDIRECT_URI` secret and redeploy.
+
 ### 5.3 Install Nginx on the server
 
 ```bash
