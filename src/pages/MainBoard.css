@@ -4,8 +4,9 @@
 }
 
 .main-board__header {
-    border-bottom: 1px solid #dbe2ea;
+    border-bottom: 1px solid #e2e8f0;
     background: #ffffff;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .main-board__header-inner {
@@ -30,15 +31,26 @@
     cursor: pointer;
 }
 
-.main-board__brand-mark {
-    font-size: 24px;
+.main-board__logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    transition: transform 0.2s ease-in-out;
+}
+
+.main-board__brand:hover .main-board__logo {
+    transform: scale(1.1);
 }
 
 .main-board__brand-title {
     margin: 0;
-    font-size: 22px;
-    font-weight: 800;
+    font-size: 24px;
+    font-weight: 900;
     color: #0f172a;
+    letter-spacing: -0.025em;
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .main-board__actions {

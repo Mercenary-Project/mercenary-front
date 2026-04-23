@@ -118,6 +118,7 @@ const MainBoard: React.FC = () => {
                 <div className="page-shell main-board__header-inner">
                     <div className="main-board__toolbar">
                         <div className="main-board__brand" onClick={() => window.location.reload()}>
+                            <img src="/logo.png" alt="Mercenary Logo" className="main-board__logo" />
                             <h1 className="main-board__brand-title">Mercenary</h1>
                         </div>
 
@@ -199,38 +200,44 @@ const MainBoard: React.FC = () => {
 
 const styles: { [key: string]: React.CSSProperties } = {
     primaryBtn: {
-        padding: '10px 16px',
-        backgroundColor: '#4CAF50',
+        padding: '10px 20px',
+        backgroundColor: '#10b981',
         color: 'white',
         border: 'none',
-        borderRadius: '10px',
+        borderRadius: '12px',
         cursor: 'pointer',
-        fontWeight: 'bold',
+        fontWeight: '700',
         fontSize: '14px',
         whiteSpace: 'nowrap',
+        boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)',
+        transition: 'all 0.2s ease',
     },
     secondaryBtn: {
-        padding: '10px 16px',
-        backgroundColor: '#888',
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
+        padding: '10px 20px',
+        backgroundColor: '#f1f5f9',
+        color: '#475569',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
         cursor: 'pointer',
+        fontWeight: '600',
         fontSize: '14px',
         whiteSpace: 'nowrap',
+        transition: 'all 0.2s ease',
     },
     card: {
         backgroundColor: 'white',
-        padding: '14px',
-        marginBottom: '10px',
-        borderRadius: '12px',
-        border: '1px solid #e5e7eb',
+        padding: '16px',
+        marginBottom: '12px',
+        borderRadius: '16px',
+        border: '1px solid #f1f5f9',
         cursor: 'pointer',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
     },
     cardTitle: {
         margin: '0 0 6px 0',
-        fontSize: '15px',
+        fontSize: '16px',
+        fontWeight: '700',
         color: '#0f172a',
     },
     cardPlace: {
@@ -239,9 +246,9 @@ const styles: { [key: string]: React.CSSProperties } = {
         color: '#64748b',
     },
     cardMeta: {
-        margin: '4px 0 0 0',
+        margin: '8px 0 0 0',
         fontSize: '13px',
-        color: '#334155',
+        color: '#059669',
         fontWeight: 600,
     },
 };
