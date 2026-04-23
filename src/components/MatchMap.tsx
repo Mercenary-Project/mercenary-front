@@ -18,19 +18,10 @@ interface MatchMapProps {
     onMarkerClick?: (id: number) => void;
 }
 
-declare global {
-    interface Window {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        kakao: any;
-    }
-}
-
 const MatchMap: React.FC<MatchMapProps> = ({ matches, center, onMarkerClick }) => {
     const mapContainer = useRef<HTMLDivElement>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mapRef = useRef<any>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const markersRef = useRef<any[]>([]);
+    const mapRef = useRef<KakaoMap | null>(null);
+    const markersRef = useRef<KakaoMarker[]>([]);
     const initialCenterRef = useRef(center);
 
     useEffect(() => {

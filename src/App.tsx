@@ -1,22 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import MainBoard from './pages/MainBoard';
 import Login from './pages/Login';
 import LoginCallback from './pages/LoginCallback';
 import MatchCreateForm from './pages/MatchCreateForm';
 import MyMatchesPage from './pages/MyMatchesPage';
-import { isAuthenticated as hasAccessToken, subscribeAuthChange } from './utils/auth';
+import PrivateRoute from './components/PrivateRoute';
+import { useAuth } from './context/AuthContext';
 
 const App: React.FC = () => {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => hasAccessToken());
-
-    useEffect(() => {
-        const syncAuthState = () => {
-            setIsAuthenticated(hasAccessToken());
-        };
-
-        return subscribeAuthChange(syncAuthState);
-    }, []);
+    const { isAuthenticated } = useAuth();
 
     return (
         <Router>
@@ -29,15 +22,15 @@ const App: React.FC = () => {
                 <Route path="/login/callback" element={<LoginCallback />} />
                 <Route
                     path="/match/create"
-                    element={isAuthenticated ? <MatchCreateForm /> : <Navigate to="/login" />}
+                    element={<PrivateRoute><MatchCreateForm /></PrivateRoute>}
                 />
                 <Route
                     path="/match/:matchId/edit"
-                    element={isAuthenticated ? <MatchCreateForm /> : <Navigate to="/login" />}
+                    element={<PrivateRoute><MatchCreateForm /></PrivateRoute>}
                 />
                 <Route
                     path="/mypage"
-                    element={isAuthenticated ? <MyMatchesPage /> : <Navigate to="/login" />}
+                    element={<PrivateRoute><MyMatchesPage /></PrivateRoute>}
                 />
                 <Route path="*" element={<Navigate to="/" />} />
             </Routes>

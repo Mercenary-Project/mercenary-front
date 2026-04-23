@@ -3,17 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import MatchMap from '../components/MatchMap';
 import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
-import { clearAccessToken, isAuthenticated as hasAccessToken, subscribeAuthChange } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
 import { buildApiUrl } from '../utils/api';
+import { apiFetch } from '../utils/apiFetch';
 import { isPastMatch } from '../utils/matchApi';
 import './MainBoard.css';
 
-declare global {
-    interface Window {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        kakao: any;
-    }
-}
 
 interface MatchResponseDto {
     id?: number;
@@ -31,7 +26,7 @@ interface MatchResponseDto {
 
 const MainBoard: React.FC = () => {
     const navigate = useNavigate();
-    const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => hasAccessToken());
+    const { isAuthenticated: isLoggedIn, logout } = useAuth();
     const [matches, setMatches] = useState<Match[]>([]);
     const [keyword, setKeyword] = useState('');
     const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
@@ -39,14 +34,6 @@ const MainBoard: React.FC = () => {
         lat: 37.5665,
         lng: 126.978,
     });
-
-    useEffect(() => {
-        const syncAuthState = () => {
-            setIsLoggedIn(hasAccessToken());
-        };
-
-        return subscribeAuthChange(syncAuthState);
-    }, []);
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -64,7 +51,7 @@ const MainBoard: React.FC = () => {
     useEffect(() => {
         const fetchMatches = async () => {
             try {
-                const response = await fetch(
+                const response = await apiFetch(
                     buildApiUrl(`/api/matches/nearby?latitude=${center.lat}&longitude=${center.lng}&distance=5.0`),
                 );
 
@@ -108,8 +95,7 @@ const MainBoard: React.FC = () => {
         }
 
         const places = new window.kakao.maps.services.Places();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        places.keywordSearch(keyword, (data: any, status: any) => {
+        places.keywordSearch(keyword, (data: KakaoPlaceResult[], status: string) => {
             if (status === window.kakao.maps.services.Status.OK) {
                 const target = data[0];
                 setCenter({ lat: Number.parseFloat(target.y), lng: Number.parseFloat(target.x) });
@@ -121,7 +107,7 @@ const MainBoard: React.FC = () => {
     };
 
     const handleLogout = () => {
-        clearAccessToken();
+        logout();
         alert('로그아웃되었습니다.');
         window.location.reload();
     };

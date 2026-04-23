@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildApiUrl } from '../utils/api';
+import { apiFetch } from '../utils/apiFetch';
 import {
     extractResponseData,
     extractResponseMessage,
@@ -10,7 +11,7 @@ import {
     isPastMatch,
     type ApplicationDecisionStatus,
 } from '../utils/matchApi';
-import { getAccessToken } from '../utils/auth';
+import { useAuth } from '../context/AuthContext';
 
 interface MatchDetailModalProps {
     matchId: number;
@@ -47,42 +48,10 @@ type ApplicationSummary = {
     createdAt: string;
 };
 
-interface TokenClaims {
-    userId?: number;
-    memberId?: number;
-    id?: number;
-    sub?: string;
-    nickname?: string;
-    name?: string;
-}
-
 const DEFAULT_APPLICATION_STATUS: MyApplicationStatus = {
     applied: false,
     status: null,
     applicationId: null,
-};
-
-const decodeAccessToken = (token: string | null): TokenClaims | null => {
-    if (!token) {
-        return null;
-    }
-
-    try {
-        const [, payload] = token.split('.');
-
-        if (!payload) {
-            return null;
-        }
-
-        const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
-        const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
-        const decodedPayload = atob(paddedPayload);
-
-        return JSON.parse(decodedPayload) as TokenClaims;
-    } catch (error) {
-        console.error('Failed to decode access token.', error);
-        return null;
-    }
 };
 
 const normalizeMyApplicationStatus = (data: unknown): MyApplicationStatus => {
@@ -132,19 +101,12 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
     const [processingApplicationId, setProcessingApplicationId] = useState<number | null>(null);
     const [canManageApplications, setCanManageApplications] = useState(false);
 
-    const token = getAccessToken();
-    const claims = decodeAccessToken(token);
-    const currentUserId =
-        claims?.userId ??
-        claims?.memberId ??
-        claims?.id ??
-        (claims?.sub && /^\d+$/.test(claims.sub) ? Number(claims.sub) : undefined);
-    const currentNickname = claims?.nickname ?? claims?.name ?? claims?.sub;
+    const { token, user } = useAuth();
     const isAuthorByPayload = Boolean(
         match &&
         (
-            (typeof currentUserId === 'number' && typeof match.writerId === 'number' && currentUserId === match.writerId) ||
-            (currentNickname && (currentNickname === match.writerNickname || currentNickname === match.writerName))
+            (typeof user?.userId === 'number' && typeof match.writerId === 'number' && user.userId === match.writerId) ||
+            (user?.nickname && (user.nickname === match.writerNickname || user.nickname === match.writerName))
         )
     );
     const isPastDue = match ? isPastMatch(match.matchDate) : false;
@@ -178,7 +140,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         setDetailError(null);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}`));
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}`));
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
@@ -211,11 +173,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         setIsStatusLoading(true);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/application/me`), {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/application/me`));
 
             if (response.status === 404) {
                 setMyApplication(DEFAULT_APPLICATION_STATUS);
@@ -249,11 +207,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         setApplicationsError(null);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications`), {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/applications`));
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
@@ -331,11 +285,8 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         setIsApplying(true);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/apply`), {
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/apply`), {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
             });
             const payload = await response.json().catch(() => null);
 
@@ -364,12 +315,9 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         setProcessingApplicationId(applicationId);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
                 method: 'PATCH',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status }),
             });
             const payload = await response.json().catch(() => null);

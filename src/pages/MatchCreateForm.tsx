@@ -1,16 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import '../components/MatchCreateForm.css';
 import { extractResponseData, extractResponseMessage, formatDateTimeLocalValue, type MatchSummary } from '../utils/matchApi';
 import { buildApiUrl } from '../utils/api';
-import { getAccessToken } from '../utils/auth';
+import { apiFetch } from '../utils/apiFetch';
+import { useAuth } from '../context/AuthContext';
 
-declare global {
-    interface Window {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        kakao: any;
-    }
-}
 
 type EditableMatchDetail = MatchSummary & {
     fullAddress?: string;
@@ -23,144 +21,170 @@ const DEFAULT_LATITUDE = 37.5665;
 const DEFAULT_LONGITUDE = 126.978;
 
 const inferDistrict = (district?: string, fullAddress?: string) => {
-    if (district?.trim()) {
-        return district.trim();
-    }
-
+    if (district?.trim()) return district.trim();
     const source = fullAddress?.trim();
-
-    if (!source) {
-        return '';
-    }
-
+    if (!source) return '';
     return source.split(' ')[1] ?? source;
 };
 
+const matchSchema = z
+    .object({
+        title: z
+            .string()
+            .min(1, '제목을 입력해 주세요.')
+            .max(100, '제목은 100자 이하로 입력해 주세요.'),
+        content: z
+            .string()
+            .max(500, '내용은 500자 이하로 입력해 주세요.')
+            .optional(),
+        matchDate: z
+            .string()
+            .min(1, '일시를 선택해 주세요.')
+            .refine((v) => new Date(v) > new Date(), '현재 시간 이후의 일시를 선택해 주세요.'),
+        currentPlayerCount: z
+            .number({ error: '숫자를 입력해 주세요.' })
+            .min(1, '현재 인원은 1명 이상이어야 합니다.')
+            .max(30, '최대 30명까지 설정 가능합니다.'),
+        maxPlayerCount: z
+            .number({ error: '숫자를 입력해 주세요.' })
+            .min(2, '모집 정원은 2명 이상이어야 합니다.')
+            .max(30, '최대 30명까지 설정 가능합니다.'),
+        placeName: z.string().min(1, '지도에서 장소를 선택해 주세요.'),
+        latitude: z.number(),
+        longitude: z.number(),
+        fullAddress: z.string().optional(),
+        district: z.string().optional(),
+    })
+    .refine((data) => data.currentPlayerCount <= data.maxPlayerCount, {
+        message: '현재 인원은 모집 정원보다 클 수 없습니다.',
+        path: ['currentPlayerCount'],
+    });
+
+type MatchFormValues = z.infer<typeof matchSchema>;
+
 const MatchCreateForm: React.FC = () => {
     const navigate = useNavigate();
+    const { token } = useAuth();
     const { matchId } = useParams<{ matchId?: string }>();
+    const mapRef = useRef<KakaoMap | null>(null);
+    const markerRef = useRef<KakaoMarker | null>(null);
     const mapContainer = useRef<HTMLDivElement>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mapRef = useRef<any>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const markerRef = useRef<any>(null);
 
     const numericMatchId = matchId ? Number(matchId) : null;
     const isEditMode = Number.isInteger(numericMatchId) && numericMatchId !== null;
 
-    const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
-    const [matchDate, setMatchDate] = useState('');
-    const [currentPlayerCount, setCurrentPlayerCount] = useState(1);
-    const [maxPlayerCount, setMaxPlayerCount] = useState(5);
-    const [district, setDistrict] = useState('');
-    const [placeName, setPlaceName] = useState('');
-    const [fullAddress, setFullAddress] = useState('');
-    const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
-    const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
     const [keyword, setKeyword] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(isEditMode);
 
-    const updateAddressFromCoords = (lat: number, lng: number) => {
-        if (!window.kakao?.maps?.services) {
-            return;
-        }
+    const {
+        register,
+        handleSubmit,
+        setValue,
+        watch,
+        reset,
+        formState: { errors, isSubmitting },
+    } = useForm<MatchFormValues>({
+        resolver: zodResolver(matchSchema),
+        mode: 'onTouched',
+        defaultValues: {
+            title: '',
+            content: '',
+            matchDate: '',
+            currentPlayerCount: 1,
+            maxPlayerCount: 5,
+            placeName: '',
+            latitude: DEFAULT_LATITUDE,
+            longitude: DEFAULT_LONGITUDE,
+            fullAddress: '',
+            district: '',
+        },
+    });
 
-        const geocoder = new window.kakao.maps.services.Geocoder();
+    const latitude = watch('latitude');
+    const longitude = watch('longitude');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        geocoder.coord2Address(lng, lat, (result: any, status: any) => {
-            if (status !== window.kakao.maps.services.Status.OK || !result?.[0]) {
-                return;
-            }
+    const updateAddressFromCoords = useCallback(
+        (lat: number, lng: number) => {
+            if (!window.kakao?.maps?.services) return;
+            const geocoder = new window.kakao.maps.services.Geocoder();
+            geocoder.coord2Address(lng, lat, (result: KakaoGeocoderResult[], status: string) => {
+                if (status !== window.kakao.maps.services.Status.OK || !result?.[0]) return;
+                const addr = result[0].address;
+                const roadAddr = result[0].road_address;
+                const resolvedAddress = roadAddr?.address_name || addr?.address_name || '';
+                setValue('fullAddress', resolvedAddress, { shouldDirty: true });
+                setValue('district', addr?.region_2depth_name || inferDistrict('', resolvedAddress), { shouldDirty: true });
+            });
+        },
+        [setValue],
+    );
 
-            const addr = result[0].address;
-            const roadAddr = result[0].road_address;
-            const resolvedAddress = roadAddr?.address_name || addr?.address_name || '';
-            setFullAddress(resolvedAddress);
-            setDistrict(addr?.region_2depth_name || inferDistrict('', resolvedAddress));
-        });
-    };
-
+    // 지도 초기화 (마운트 시 1회)
     useEffect(() => {
-        if (!window.kakao?.maps || !mapContainer.current || mapRef.current) {
-            return;
-        }
+        if (!window.kakao?.maps || !mapContainer.current || mapRef.current) return;
 
-        const center = new window.kakao.maps.LatLng(latitude, longitude);
-        mapRef.current = new window.kakao.maps.Map(mapContainer.current, {
-            center,
-            level: 3,
-        });
+        const center = new window.kakao.maps.LatLng(DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
+        mapRef.current = new window.kakao.maps.Map(mapContainer.current, { center, level: 3 });
         markerRef.current = new window.kakao.maps.Marker({ position: center });
         markerRef.current.setMap(mapRef.current);
 
         if (navigator.geolocation && !isEditMode) {
             navigator.geolocation.getCurrentPosition((position) => {
-                const nextLatitude = position.coords.latitude;
-                const nextLongitude = position.coords.longitude;
-                setLatitude(nextLatitude);
-                setLongitude(nextLongitude);
-                updateAddressFromCoords(nextLatitude, nextLongitude);
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                setValue('latitude', lat, { shouldDirty: true });
+                setValue('longitude', lng, { shouldDirty: true });
+                updateAddressFromCoords(lat, lng);
             });
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        window.kakao.maps.event.addListener(mapRef.current, 'click', (mouseEvent: any) => {
+        window.kakao.maps.event.addListener(mapRef.current, 'click', (mouseEvent: KakaoMouseEvent) => {
             const latLng = mouseEvent.latLng;
-            const nextLatitude = latLng.getLat();
-            const nextLongitude = latLng.getLng();
-
-            setLatitude(nextLatitude);
-            setLongitude(nextLongitude);
-            setPlaceName('선택한 위치');
-            updateAddressFromCoords(nextLatitude, nextLongitude);
+            const lat = latLng.getLat();
+            const lng = latLng.getLng();
+            setValue('latitude', lat, { shouldDirty: true });
+            setValue('longitude', lng, { shouldDirty: true });
+            setValue('placeName', '선택한 위치', { shouldValidate: true });
+            updateAddressFromCoords(lat, lng);
         });
-    }, [isEditMode, latitude, longitude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
+    // 위도/경도 변경 시 지도 마커·센터 동기화
     useEffect(() => {
-        if (!mapRef.current || !markerRef.current || !window.kakao?.maps) {
-            return;
-        }
-
+        if (!mapRef.current || !markerRef.current || !window.kakao?.maps) return;
         const center = new window.kakao.maps.LatLng(latitude, longitude);
         mapRef.current.setCenter(center);
         markerRef.current.setPosition(center);
     }, [latitude, longitude]);
 
+    // 수정 모드: 기존 매치 데이터 로드
     useEffect(() => {
-        if (!isEditMode || !numericMatchId) {
-            return;
-        }
+        if (!isEditMode || !numericMatchId) return;
 
         const fetchMatchDetail = async () => {
             setIsLoading(true);
-
             try {
-                const response = await fetch(buildApiUrl(`/api/matches/${numericMatchId}`));
+                const response = await apiFetch(buildApiUrl(`/api/matches/${numericMatchId}`));
                 const payload = await response.json().catch(() => null);
-
                 if (!response.ok) {
                     throw new Error(extractResponseMessage(payload, '매치 정보를 불러오지 못했습니다.'));
                 }
-
                 const data = extractResponseData<EditableMatchDetail>(payload);
+                if (!data) throw new Error('매치 정보가 비어 있습니다.');
 
-                if (!data) {
-                    throw new Error('매치 정보가 비어 있습니다.');
-                }
-
-                setTitle(data.title ?? '');
-                setContent(data.content ?? '');
-                setPlaceName(data.placeName ?? '');
-                setFullAddress(data.fullAddress ?? data.addressName ?? '');
-                setDistrict(inferDistrict(data.district, data.fullAddress ?? data.addressName));
-                setLatitude(data.latitude ?? DEFAULT_LATITUDE);
-                setLongitude(data.longitude ?? DEFAULT_LONGITUDE);
-                setMatchDate(formatDateTimeLocalValue(data.matchDate));
-                setCurrentPlayerCount(data.currentPlayerCount ?? 1);
-                setMaxPlayerCount(data.maxPlayerCount ?? 5);
+                reset({
+                    title: data.title ?? '',
+                    content: data.content ?? '',
+                    placeName: data.placeName ?? '',
+                    fullAddress: data.fullAddress ?? data.addressName ?? '',
+                    district: inferDistrict(data.district, data.fullAddress ?? data.addressName),
+                    latitude: data.latitude ?? DEFAULT_LATITUDE,
+                    longitude: data.longitude ?? DEFAULT_LONGITUDE,
+                    matchDate: formatDateTimeLocalValue(data.matchDate),
+                    currentPlayerCount: data.currentPlayerCount ?? 1,
+                    maxPlayerCount: data.maxPlayerCount ?? 5,
+                });
             } catch (error) {
                 console.error(error);
                 alert(error instanceof Error ? error.message : '매치 정보를 불러오는 중 오류가 발생했습니다.');
@@ -171,70 +195,51 @@ const MatchCreateForm: React.FC = () => {
         };
 
         void fetchMatchDetail();
-    }, [isEditMode, navigate, numericMatchId]);
+    }, [isEditMode, navigate, numericMatchId, reset]);
 
     const handleSearch = () => {
         if (!keyword.trim()) {
             alert('검색어를 입력해 주세요.');
             return;
         }
-
         if (!window.kakao?.maps?.services) {
             alert('지도 서비스를 불러오지 못했습니다.');
             return;
         }
-
         const places = new window.kakao.maps.services.Places();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        places.keywordSearch(keyword, (data: any, status: any) => {
+        places.keywordSearch(keyword, (data: KakaoPlaceResult[], status: string) => {
             if (status !== window.kakao.maps.services.Status.OK || !data?.[0]) {
                 alert('검색 결과가 없습니다.');
                 return;
             }
-
             const target = data[0];
-            const nextLatitude = Number.parseFloat(target.y);
-            const nextLongitude = Number.parseFloat(target.x);
-
-            setLatitude(nextLatitude);
-            setLongitude(nextLongitude);
-            setPlaceName(target.place_name ?? '');
-            updateAddressFromCoords(nextLatitude, nextLongitude);
+            const lat = Number.parseFloat(target.y);
+            const lng = Number.parseFloat(target.x);
+            setValue('latitude', lat, { shouldDirty: true });
+            setValue('longitude', lng, { shouldDirty: true });
+            setValue('placeName', target.place_name ?? '', { shouldValidate: true });
+            updateAddressFromCoords(lat, lng);
         });
     };
 
-    const handleSubmit = async () => {
-        const token = getAccessToken();
-
+    const onSubmit = async (data: MatchFormValues) => {
         if (!token) {
             alert('로그인이 필요합니다.');
             navigate('/login');
             return;
         }
 
-        if (!title.trim() || !matchDate || !placeName.trim()) {
-            alert('제목, 일시, 장소는 필수 입력 항목입니다.');
-            return;
-        }
-
-        if (currentPlayerCount > maxPlayerCount) {
-            alert('현재 인원은 모집 정원보다 클 수 없습니다.');
-            return;
-        }
-
-        setIsSubmitting(true);
-
         const requestData = {
-            title: title.trim(),
-            content: content.trim(),
-            matchDate,
-            currentPlayerCount: Number(currentPlayerCount),
-            maxPlayerCount: Number(maxPlayerCount),
-            placeName: placeName.trim(),
-            fullAddress: fullAddress.trim(),
-            district: district.trim(),
-            latitude,
-            longitude,
+            title: data.title.trim(),
+            content: data.content?.trim() ?? '',
+            matchDate: data.matchDate,
+            currentPlayerCount: data.currentPlayerCount,
+            maxPlayerCount: data.maxPlayerCount,
+            placeName: data.placeName.trim(),
+            fullAddress: data.fullAddress?.trim() ?? '',
+            district: data.district?.trim() ?? '',
+            latitude: data.latitude,
+            longitude: data.longitude,
         };
 
         try {
@@ -242,12 +247,9 @@ const MatchCreateForm: React.FC = () => {
                 ? buildApiUrl(`/api/matches/${numericMatchId}`)
                 : buildApiUrl('/api/matches');
             const method = isEditMode ? 'PATCH' : 'POST';
-            const response = await fetch(endpoint, {
+            const response = await apiFetch(endpoint, {
                 method,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestData),
             });
             const payload = await response.json().catch(() => null);
@@ -261,8 +263,6 @@ const MatchCreateForm: React.FC = () => {
         } catch (error) {
             console.error(error);
             alert(error instanceof Error ? error.message : '요청 처리 중 오류가 발생했습니다.');
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -286,62 +286,70 @@ const MatchCreateForm: React.FC = () => {
                 <div style={{ width: '24px' }} />
             </div>
 
-            <div className="mc-content">
+            <form className="mc-content" onSubmit={handleSubmit(onSubmit)} noValidate>
                 <div className="mc-card">
                     <h3 className="mc-section-title">경기 정보</h3>
 
                     <div className="mc-input-group">
-                        <label className="mc-label">제목</label>
+                        <label className="mc-label">
+                            제목 <span className="mc-required">*</span>
+                        </label>
                         <input
+                            {...register('title')}
                             type="text"
-                            className="mc-input"
+                            className={`mc-input${errors.title ? ' mc-input--error' : ''}`}
                             placeholder="예: 이번 주 수요일 6vs6 매치"
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
                         />
+                        {errors.title && <p className="mc-field-error">{errors.title.message}</p>}
                     </div>
 
                     <div className="mc-input-group">
-                        <label className="mc-label">일시</label>
+                        <label className="mc-label">
+                            일시 <span className="mc-required">*</span>
+                        </label>
                         <input
+                            {...register('matchDate')}
                             type="datetime-local"
-                            className="mc-input"
-                            value={matchDate}
-                            onChange={(event) => setMatchDate(event.target.value)}
+                            className={`mc-input${errors.matchDate ? ' mc-input--error' : ''}`}
                         />
+                        {errors.matchDate && <p className="mc-field-error">{errors.matchDate.message}</p>}
                     </div>
 
                     <div className="mc-row">
                         <div style={{ flex: 1 }} className="mc-input-group">
                             <label className="mc-label">현재 인원</label>
                             <input
+                                {...register('currentPlayerCount', { valueAsNumber: true })}
                                 type="number"
-                                className="mc-input"
-                                value={currentPlayerCount}
+                                className={`mc-input${errors.currentPlayerCount ? ' mc-input--error' : ''}`}
                                 min={1}
-                                onChange={(event) => setCurrentPlayerCount(Number(event.target.value))}
                             />
+                            {errors.currentPlayerCount && (
+                                <p className="mc-field-error">{errors.currentPlayerCount.message}</p>
+                            )}
                         </div>
                         <div style={{ flex: 1 }} className="mc-input-group">
                             <label className="mc-label">모집 정원</label>
                             <input
+                                {...register('maxPlayerCount', { valueAsNumber: true })}
                                 type="number"
-                                className="mc-input"
-                                value={maxPlayerCount}
+                                className={`mc-input${errors.maxPlayerCount ? ' mc-input--error' : ''}`}
                                 min={2}
-                                onChange={(event) => setMaxPlayerCount(Number(event.target.value))}
                             />
+                            {errors.maxPlayerCount && (
+                                <p className="mc-field-error">{errors.maxPlayerCount.message}</p>
+                            )}
                         </div>
                     </div>
 
                     <div className="mc-input-group">
                         <label className="mc-label">내용</label>
                         <textarea
-                            className="mc-textarea"
+                            {...register('content')}
+                            className={`mc-textarea${errors.content ? ' mc-input--error' : ''}`}
                             placeholder="준비물, 실력, 전달 사항 등을 적어 주세요."
-                            value={content}
-                            onChange={(event) => setContent(event.target.value)}
                         />
+                        {errors.content && <p className="mc-field-error">{errors.content.message}</p>}
                     </div>
                 </div>
 
@@ -366,34 +374,50 @@ const MatchCreateForm: React.FC = () => {
 
                     <div className="mc-location-result">
                         <div className="mc-input-group">
-                            <label className="mc-label">장소명</label>
+                            <label className="mc-label">
+                                장소명 <span className="mc-required">*</span>
+                            </label>
                             <input
+                                {...register('placeName')}
                                 type="text"
-                                className="mc-readonly-input"
+                                className={`mc-readonly-input${errors.placeName ? ' mc-input--error' : ''}`}
                                 style={{ fontWeight: 'bold' }}
-                                value={placeName}
-                                onChange={(event) => setPlaceName(event.target.value)}
                                 placeholder="지도를 클릭하거나 검색해 주세요."
                             />
+                            {errors.placeName && (
+                                <p className="mc-field-error">{errors.placeName.message}</p>
+                            )}
                         </div>
 
                         <div className="mc-row">
                             <div style={{ flex: 1 }} className="mc-input-group">
                                 <label className="mc-label">지역구</label>
-                                <input type="text" className="mc-readonly-input" value={district} readOnly />
+                                <input
+                                    {...register('district')}
+                                    type="text"
+                                    className="mc-readonly-input"
+                                    readOnly
+                                />
                             </div>
                             <div style={{ flex: 2 }} className="mc-input-group">
                                 <label className="mc-label">상세 주소</label>
-                                <input type="text" className="mc-readonly-input" value={fullAddress} readOnly />
+                                <input
+                                    {...register('fullAddress')}
+                                    type="text"
+                                    className="mc-readonly-input"
+                                    readOnly
+                                />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <button onClick={handleSubmit} className="mc-submit-btn" type="button" disabled={isSubmitting}>
-                    {isSubmitting ? (isEditMode ? '매치 수정 중...' : '매치 등록 중...') : isEditMode ? '매치 수정하기' : '매치 등록하기'}
+                <button className="mc-submit-btn" type="submit" disabled={isSubmitting}>
+                    {isSubmitting
+                        ? isEditMode ? '매치 수정 중...' : '매치 등록 중...'
+                        : isEditMode ? '매치 수정하기' : '매치 등록하기'}
                 </button>
-            </div>
+            </form>
         </div>
     );
 };

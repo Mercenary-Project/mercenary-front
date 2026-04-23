@@ -11,7 +11,8 @@ import {
     type MatchSummary,
 } from '../utils/matchApi';
 import { buildApiUrl } from '../utils/api';
-import { getAccessToken, subscribeAuthChange } from '../utils/auth';
+import { apiFetch } from '../utils/apiFetch';
+import { useAuth } from '../context/AuthContext';
 
 type LoadedApplications = Record<number, ApplicationSummary[]>;
 type ApplicationErrors = Record<number, string>;
@@ -36,7 +37,7 @@ const getMatchId = (match: MatchSummary) => match.matchId ?? match.id ?? 0;
 
 const MyMatchesPage: React.FC = () => {
     const navigate = useNavigate();
-    const [token, setToken] = useState<string | null>(() => getAccessToken());
+    const { token } = useAuth();
     const [activeTab, setActiveTab] = useState<TabKey>('authored');
     const [authoredMatches, setAuthoredMatches] = useState<MatchSummary[]>([]);
     const [appliedMatches, setAppliedMatches] = useState<AppliedMatchSummary[]>([]);
@@ -53,13 +54,6 @@ const MyMatchesPage: React.FC = () => {
     const visibleAppliedMatches = appliedMatches.filter((match) => !isPastMatch(match.matchDate));
     const archivedAppliedMatches = appliedMatches.filter((match) => isPastMatch(match.matchDate));
 
-    useEffect(() => {
-        const syncAuthState = () => {
-            setToken(getAccessToken());
-        };
-
-        return subscribeAuthChange(syncAuthState);
-    }, []);
 
     const fetchAuthoredMatches = useCallback(async () => {
         if (!token) {
@@ -67,11 +61,7 @@ const MyMatchesPage: React.FC = () => {
             return;
         }
 
-        const response = await fetch(MY_MATCH_ENDPOINT, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+        const response = await apiFetch(MY_MATCH_ENDPOINT);
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
@@ -88,11 +78,7 @@ const MyMatchesPage: React.FC = () => {
             return;
         }
 
-        const response = await fetch(MY_APPLIED_MATCH_ENDPOINT, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+        const response = await apiFetch(MY_APPLIED_MATCH_ENDPOINT);
         const payload = await response.json().catch(() => null);
 
         if (!response.ok) {
@@ -131,11 +117,7 @@ const MyMatchesPage: React.FC = () => {
         setErrorByMatch((prev) => ({ ...prev, [matchId]: '' }));
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications`), {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/applications`));
             const payload = await response.json().catch(() => null);
 
             if (!response.ok) {
@@ -183,12 +165,9 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`decision-${matchId}-${applicationId}`);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/applications/${applicationId}`), {
                 method: 'PATCH',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status }),
             });
             const payload = await response.json().catch(() => null);
@@ -214,11 +193,8 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`cancel-${matchId}`);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}/application/me`), {
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/application/me`), {
                 method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
             });
             const payload = await response.json().catch(() => null);
 
@@ -249,11 +225,8 @@ const MyMatchesPage: React.FC = () => {
         setProcessingKey(`delete-${matchId}`);
 
         try {
-            const response = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
+            const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}`), {
                 method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
             });
             const payload = await response.json().catch(() => null);
 
