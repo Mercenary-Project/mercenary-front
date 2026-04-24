@@ -318,7 +318,7 @@ const MyMatchesPage: React.FC = () => {
                                                 setOpenMenuMatchId(openMenuMatchId === matchId ? null : matchId);
                                             }}
                                         >
-                                            •••
+                                            ⋮
                                         </button>
                                         {openMenuMatchId === matchId && (
                                             <div style={styles.dropdown} onClick={(e) => e.stopPropagation()}>
@@ -529,9 +529,6 @@ const MyMatchesPage: React.FC = () => {
                     <div style={styles.headerActions}>
                         <button type="button" style={styles.secondaryButton} onClick={() => navigate('/')}>
                             메인으로
-                        </button>
-                        <button type="button" style={styles.primaryButton} onClick={() => void refreshAllMatches()}>
-                            새로고침
                         </button>
                     </div>
                 </div>
@@ -753,15 +750,15 @@ const styles: { [key: string]: React.CSSProperties } = {
         alignItems: 'center',
     },
     menuButton: {
-        padding: '10px 14px',
+        padding: '6px 10px',
         backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
         color: '#475569',
         border: '1px solid #e2e8f0',
         borderRadius: '10px',
         cursor: 'pointer',
         fontWeight: 700,
-        fontSize: '14px',
-        letterSpacing: '2px',
+        fontSize: '18px',
+        lineHeight: 1,
         whiteSpace: 'nowrap',
     },
     dropdown: {
