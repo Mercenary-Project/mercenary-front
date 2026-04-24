@@ -1,5 +1,6 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { clearAccessToken, getAccessToken, subscribeAuthChange } from '../utils/auth';
+import { AuthContext, type AuthUser } from './authContextDef';
 
 interface RawTokenClaims {
     userId?: number;
@@ -9,20 +10,6 @@ interface RawTokenClaims {
     nickname?: string;
     name?: string;
 }
-
-export interface AuthUser {
-    userId: number | undefined;
-    nickname: string | undefined;
-}
-
-interface AuthContextValue {
-    token: string | null;
-    user: AuthUser | null;
-    isAuthenticated: boolean;
-    logout: () => void;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const decodeTokenClaims = (token: string | null): RawTokenClaims | null => {
     if (!token) return null;
@@ -65,4 +52,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         </AuthContext.Provider>
     );
 };
-
