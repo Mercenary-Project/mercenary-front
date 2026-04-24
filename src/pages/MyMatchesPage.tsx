@@ -625,8 +625,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     activeTabButton: {
         padding: '12px 16px',
-        backgroundColor: MAIN_PRIMARY_BUTTON_COLOR,
-        border: 'none',
+        backgroundColor: '#334155',
+        border: '1px solid #334155',
         borderRadius: '12px',
         color: '#ffffff',
         cursor: 'pointer',

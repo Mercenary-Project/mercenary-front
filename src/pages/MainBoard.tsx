@@ -30,6 +30,8 @@ const MainBoard: React.FC = () => {
     const [matches, setMatches] = useState<Match[]>([]);
     const [keyword, setKeyword] = useState('');
     const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [weekOffset, setWeekOffset] = useState(0);
     const [center, setCenter] = useState<{ lat: number; lng: number }>({
         lat: 37.5665,
         lng: 126.978,
@@ -83,6 +85,42 @@ const MainBoard: React.FC = () => {
 
         void fetchMatches();
     }, [center]);
+
+    const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+    const toDateKey = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const todayKey = toDateKey(new Date());
+    const getWeekDates = (): Date[] => {
+        const base = new Date();
+        base.setDate(base.getDate() + weekOffset * 7);
+        return Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(base);
+            d.setDate(base.getDate() + i);
+            return d;
+        });
+    };
+    const displayedMatches = selectedDate
+        ? matches.filter((m) => m.matchDate?.startsWith(selectedDate))
+        : matches;
+
+    const formatMatchTime = (matchDate?: string): string => {
+        if (!matchDate) return '--:--';
+        try {
+            const d = new Date(matchDate);
+            return d.toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Seoul',
+            });
+        } catch {
+            return '--:--';
+        }
+    };
 
     const handleSearch = () => {
         if (!keyword.trim()) {
@@ -145,8 +183,43 @@ const MainBoard: React.FC = () => {
                         />
                         <button onClick={handleSearch} style={{ ...styles.primaryBtn, backgroundColor: '#334155' }}>이동</button>
                     </div>
+
                 </div>
             </header>
+
+            <div className="page-shell main-board__date-section">
+                <div className="main-board__date-strip">
+                    <button
+                        className="main-board__date-nav"
+                        onClick={() => setWeekOffset((w) => w - 1)}
+                    >‹</button>
+                    {getWeekDates().map((date) => {
+                        const key = toDateKey(date);
+                        const dow = date.getDay();
+                        const isSelected = selectedDate === key;
+                        const isToday = key === todayKey;
+                        let btnClass = 'main-board__date-btn';
+                        if (isSelected) btnClass += ' main-board__date-btn--active';
+                        else if (isToday) btnClass += ' main-board__date-btn--today';
+                        if (dow === 0) btnClass += ' main-board__date-btn--sun';
+                        if (dow === 6) btnClass += ' main-board__date-btn--sat';
+                        return (
+                            <button
+                                key={key}
+                                className={btnClass}
+                                onClick={() => setSelectedDate(isSelected ? null : key)}
+                            >
+                                <span className="main-board__date-num">{date.getDate()}</span>
+                                <span className="main-board__date-day">{DAY_NAMES[dow]}</span>
+                            </button>
+                        );
+                    })}
+                    <button
+                        className="main-board__date-nav"
+                        onClick={() => setWeekOffset((w) => w + 1)}
+                    >›</button>
+                </div>
+            </div>
 
             <main className="page-shell main-board__content">
                 <div className="main-board__map-panel">
@@ -159,24 +232,31 @@ const MainBoard: React.FC = () => {
 
                 <section className="main-board__list-panel">
                     <div className="main-board__list-header">
-                        <h3 className="main-board__list-title">매치 목록 ({matches.length})</h3>
+                        <h3 className="main-board__list-title">매치 목록 ({displayedMatches.length})</h3>
                     </div>
 
                     <div className="main-board__list-body">
-                        {matches.length === 0 ? (
-                            <div className="main-board__empty">주변에 등록된 경기가 없습니다.</div>
+                        {displayedMatches.length === 0 ? (
+                            <div className="main-board__empty">
+                                {selectedDate ? '선택한 날짜에 등록된 경기가 없습니다.' : '주변에 등록된 경기가 없습니다.'}
+                            </div>
                         ) : (
-                            matches.map((match) => (
+                            displayedMatches.map((match) => (
                                 <div
                                     key={match.matchId}
-                                    style={styles.card}
+                                    className="main-board__match-card"
                                     onClick={() => setSelectedMatchId(match.matchId || 0)}
                                 >
-                                    <h4 style={styles.cardTitle}>{match.title || match.placeName}</h4>
-                                    <p style={styles.cardMeta}>
-                                        인원 {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
-                                    </p>
-                                    <p style={styles.cardPlace}>장소 {match.placeName}</p>
+                                    <span className="main-board__match-time">
+                                        {formatMatchTime(match.matchDate)}
+                                    </span>
+                                    <div className="main-board__match-info">
+                                        <h4 className="main-board__match-title">{match.title || match.placeName}</h4>
+                                        <p className="main-board__match-place">{match.placeName}</p>
+                                    </div>
+                                    <span className="main-board__match-count">
+                                        {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
+                                    </span>
                                 </div>
                             ))
                         )}
@@ -222,33 +302,6 @@ const styles: { [key: string]: React.CSSProperties } = {
         fontSize: '14px',
         whiteSpace: 'nowrap',
         transition: 'all 0.2s ease',
-    },
-    card: {
-        backgroundColor: 'white',
-        padding: '16px',
-        marginBottom: '12px',
-        borderRadius: '16px',
-        border: '1px solid #f1f5f9',
-        cursor: 'pointer',
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-    },
-    cardTitle: {
-        margin: '0 0 6px 0',
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#0f172a',
-    },
-    cardPlace: {
-        margin: 0,
-        fontSize: '13px',
-        color: '#64748b',
-    },
-    cardMeta: {
-        margin: '8px 0 0 0',
-        fontSize: '13px',
-        color: '#059669',
-        fontWeight: 600,
     },
 };
 
