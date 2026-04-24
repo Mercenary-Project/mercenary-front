@@ -62,7 +62,7 @@
     font-size: 16px;
     font-weight: 700;
     color: #0f172a;
-    border-left: 3px solid #4CAF50;
+    border-left: 3px solid #10b981;
     padding-left: 8px;
 }
 
@@ -117,8 +117,8 @@
 .mc-textarea:focus,
 .mc-search-input:focus,
 .mc-readonly-input:focus {
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .mc-search-box {
@@ -159,7 +159,7 @@
 .mc-submit-btn {
     width: 100%;
     padding: 16px;
-    background-color: #4CAF50;
+    background-color: #10b981;
     color: white;
     border: none;
     border-radius: 12px;
@@ -168,11 +168,11 @@
     cursor: pointer;
     margin-top: 8px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .mc-submit-btn:active {
-    background-color: #43a047;
+    background-color: #059669;
     transform: scale(0.98);
 }
 

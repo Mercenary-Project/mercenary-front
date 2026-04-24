@@ -30,8 +30,8 @@ type ArchiveItem = {
 
 const MY_MATCH_ENDPOINT = buildApiUrl('/api/matches/my');
 const MY_APPLIED_MATCH_ENDPOINT = buildApiUrl('/api/matches/applied');
-const MAIN_PRIMARY_BUTTON_COLOR = '#4CAF50';
-const MAIN_SECONDARY_BUTTON_COLOR = '#888';
+const MAIN_PRIMARY_BUTTON_COLOR = '#10b981';
+const MAIN_SECONDARY_BUTTON_COLOR = '#f1f5f9';
 
 const getMatchId = (match: MatchSummary) => match.matchId ?? match.id ?? 0;
 
@@ -48,6 +48,14 @@ const MyMatchesPage: React.FC = () => {
     const [loadingByMatch, setLoadingByMatch] = useState<LoadingMatches>({});
     const [errorByMatch, setErrorByMatch] = useState<ApplicationErrors>({});
     const [processingKey, setProcessingKey] = useState<string | null>(null);
+    const [openMenuMatchId, setOpenMenuMatchId] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (openMenuMatchId === null) return;
+        const close = () => setOpenMenuMatchId(null);
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+    }, [openMenuMatchId]);
 
     const visibleAuthoredMatches = authoredMatches.filter((match) => !isPastMatch(match.matchDate));
     const archivedAuthoredMatches = authoredMatches.filter((match) => isPastMatch(match.matchDate));
@@ -294,28 +302,50 @@ const MyMatchesPage: React.FC = () => {
                                 <div style={styles.matchActionGroup}>
                                     <button
                                         type="button"
-                                        style={styles.secondaryButton}
-                                        onClick={() => navigate(`/match/${matchId}/edit`)}
-                                        disabled={Boolean(processingKey)}
-                                    >
-                                        수정
-                                    </button>
-                                    <button
-                                        type="button"
-                                        style={isDeleting ? styles.disabledButton : styles.dangerButton}
-                                        onClick={() => void handleDeleteMatch(matchId, match.title)}
-                                        disabled={Boolean(processingKey)}
-                                    >
-                                        {isDeleting ? '삭제 중...' : '삭제'}
-                                    </button>
-                                    <button
-                                        type="button"
                                         style={styles.primaryButton}
                                         onClick={() => handleToggleApplications(matchId)}
                                         disabled={isDeleting}
                                     >
                                         {isExpanded ? '신청자 닫기' : '신청자 보기'}
                                     </button>
+                                    <div style={{ position: 'relative' }}>
+                                        <button
+                                            type="button"
+                                            style={styles.menuButton}
+                                            disabled={Boolean(processingKey)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenMenuMatchId(openMenuMatchId === matchId ? null : matchId);
+                                            }}
+                                        >
+                                            •••
+                                        </button>
+                                        {openMenuMatchId === matchId && (
+                                            <div style={styles.dropdown} onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    style={styles.dropdownItem}
+                                                    onClick={() => {
+                                                        setOpenMenuMatchId(null);
+                                                        navigate(`/match/${matchId}/edit`);
+                                                    }}
+                                                >
+                                                    수정
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    style={styles.dropdownItemDanger}
+                                                    disabled={Boolean(processingKey)}
+                                                    onClick={() => {
+                                                        setOpenMenuMatchId(null);
+                                                        void handleDeleteMatch(matchId, match.title);
+                                                    }}
+                                                >
+                                                    {isDeleting ? '삭제 중...' : '삭제'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
@@ -590,9 +620,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     tabButton: {
         padding: '12px 16px',
         backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
-        border: 'none',
+        border: '1px solid #e2e8f0',
         borderRadius: '12px',
-        color: '#ffffff',
+        color: '#475569',
         cursor: 'pointer',
         fontWeight: 700,
     },
@@ -720,6 +750,56 @@ const styles: { [key: string]: React.CSSProperties } = {
         display: 'flex',
         gap: '10px',
         flexWrap: 'wrap',
+        alignItems: 'center',
+    },
+    menuButton: {
+        padding: '10px 14px',
+        backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
+        color: '#475569',
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        fontWeight: 700,
+        fontSize: '14px',
+        letterSpacing: '2px',
+        whiteSpace: 'nowrap',
+    },
+    dropdown: {
+        position: 'absolute',
+        top: 'calc(100% + 6px)',
+        right: 0,
+        backgroundColor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: '10px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+        zIndex: 10,
+        minWidth: '110px',
+        overflow: 'hidden',
+    },
+    dropdownItem: {
+        display: 'block',
+        width: '100%',
+        padding: '12px 16px',
+        backgroundColor: 'transparent',
+        border: 'none',
+        textAlign: 'left' as const,
+        cursor: 'pointer',
+        fontWeight: 600,
+        color: '#1e293b',
+        fontSize: '14px',
+    },
+    dropdownItemDanger: {
+        display: 'block',
+        width: '100%',
+        padding: '12px 16px',
+        backgroundColor: 'transparent',
+        border: 'none',
+        borderTop: '1px solid #f1f5f9',
+        textAlign: 'left' as const,
+        cursor: 'pointer',
+        fontWeight: 600,
+        color: '#dc2626',
+        fontSize: '14px',
     },
     primaryButton: {
         padding: '10px 16px',
@@ -734,8 +814,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     secondaryButton: {
         padding: '10px 16px',
         backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
-        color: '#ffffff',
-        border: 'none',
+        color: '#475569',
+        border: '1px solid #e2e8f0',
         borderRadius: '10px',
         cursor: 'pointer',
         fontWeight: 700,
@@ -764,10 +844,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     rejectButton: {
         flex: 1,
         padding: '10px 12px',
-        border: 'none',
+        border: '1px solid #e2e8f0',
         borderRadius: '10px',
         backgroundColor: MAIN_SECONDARY_BUTTON_COLOR,
-        color: '#ffffff',
+        color: '#475569',
         cursor: 'pointer',
         fontWeight: 700,
     },

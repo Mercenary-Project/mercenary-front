@@ -485,7 +485,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
                                     <>
                                         <button
                                             onClick={handleLoginRedirect}
-                                            style={{ ...styles.joinBtn, backgroundColor: '#2563eb', cursor: 'pointer' }}
+                                            style={{ ...styles.joinBtn, backgroundColor: '#10b981', cursor: 'pointer' }}
                                         >
                                             로그인 후 신청하기
                                         </button>
@@ -497,7 +497,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
                                             onClick={handleJoin}
                                             style={{
                                                 ...styles.joinBtn,
-                                                backgroundColor: myApplication.applied || isJoinBlockedByMatchState ? '#94a3b8' : isApplying ? '#93c5fd' : '#2563eb',
+                                                backgroundColor: myApplication.applied || isJoinBlockedByMatchState ? '#94a3b8' : isApplying ? '#6ee7b7' : '#10b981',
                                                 cursor: isJoinDisabled ? 'not-allowed' : 'pointer',
                                             }}
                                             disabled={isJoinDisabled}
@@ -726,7 +726,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         borderRadius: '8px',
         padding: '10px 12px',
         color: '#ffffff',
-        backgroundColor: '#16a34a',
+        backgroundColor: '#10b981',
         cursor: 'pointer',
         fontWeight: 'bold',
     },
