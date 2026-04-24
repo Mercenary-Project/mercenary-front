@@ -11,7 +11,7 @@ import {
     isPastMatch,
     type ApplicationDecisionStatus,
 } from '../utils/matchApi';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 interface MatchDetailModalProps {
     matchId: number;

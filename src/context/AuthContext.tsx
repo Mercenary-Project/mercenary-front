@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { clearAccessToken, getAccessToken, subscribeAuthChange } from '../utils/auth';
 
 interface RawTokenClaims {
@@ -22,7 +22,7 @@ interface AuthContextValue {
     logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const decodeTokenClaims = (token: string | null): RawTokenClaims | null => {
     if (!token) return null;
@@ -66,8 +66,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 };
 
-export const useAuth = (): AuthContextValue => {
-    const ctx = useContext(AuthContext);
-    if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-    return ctx;
-};

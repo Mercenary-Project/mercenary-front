@@ -12,7 +12,7 @@ import {
 } from '../utils/matchApi';
 import { buildApiUrl } from '../utils/api';
 import { apiFetch } from '../utils/apiFetch';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 type LoadedApplications = Record<number, ApplicationSummary[]>;
 type ApplicationErrors = Record<number, string>;

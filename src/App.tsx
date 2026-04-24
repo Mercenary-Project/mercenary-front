@@ -6,7 +6,7 @@ import LoginCallback from './pages/LoginCallback';
 import MatchCreateForm from './pages/MatchCreateForm';
 import MyMatchesPage from './pages/MyMatchesPage';
 import PrivateRoute from './components/PrivateRoute';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth';
 
 const App: React.FC = () => {
     const { isAuthenticated } = useAuth();

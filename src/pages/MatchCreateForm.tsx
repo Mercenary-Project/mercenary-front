@@ -7,7 +7,7 @@ import '../components/MatchCreateForm.css';
 import { extractResponseData, extractResponseMessage, formatDateTimeLocalValue, type MatchSummary } from '../utils/matchApi';
 import { buildApiUrl } from '../utils/api';
 import { apiFetch } from '../utils/apiFetch';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 
 
 type EditableMatchDetail = MatchSummary & {

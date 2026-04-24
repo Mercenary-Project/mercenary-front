@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MatchMap from '../components/MatchMap';
 import MatchDetailModal from '../components/MatchDetailModal';
 import type { Match } from '../components/MatchMap';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { buildApiUrl } from '../utils/api';
 import { apiFetch } from '../utils/apiFetch';
 import { isPastMatch } from '../utils/matchApi';
