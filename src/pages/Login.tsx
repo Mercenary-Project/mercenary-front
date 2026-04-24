@@ -85,7 +85,7 @@ const Login: React.FC = () => {
         <div style={styles.page}>
             <div className="page-shell" style={styles.shell}>
                 <div style={styles.loginBox}>
-                    <h1 style={styles.title}>Mercenary High</h1>
+                    <h1 style={styles.title}>Mercenary</h1>
                     <p style={styles.subtitle}>로컬 테스트용 로그인 방식을 선택해 주세요.</p>
 
                     <button

@@ -16,6 +16,8 @@ dist-ssr
 !.env.example
 !.env.production.example
 
+CLAUDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -26,3 +28,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+

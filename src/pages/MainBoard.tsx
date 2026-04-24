@@ -118,7 +118,6 @@ const MainBoard: React.FC = () => {
                 <div className="page-shell main-board__header-inner">
                     <div className="main-board__toolbar">
                         <div className="main-board__brand" onClick={() => window.location.reload()}>
-                            <img src="/logo.png" alt="Mercenary Logo" className="main-board__logo" />
                             <h1 className="main-board__brand-title">Mercenary</h1>
                         </div>
 

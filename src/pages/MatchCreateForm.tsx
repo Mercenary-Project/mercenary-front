@@ -119,13 +119,13 @@ const MatchCreateForm: React.FC = () => {
         [setValue],
     );
 
-    // 지도 초기화 (마운트 시 1회)
+    // 지도 초기화 (isLoading 해제 후 mapContainer가 DOM에 마운트된 뒤 실행)
     useEffect(() => {
         if (!window.kakao?.maps || !mapContainer.current || mapRef.current) return;
 
-        const center = new window.kakao.maps.LatLng(DEFAULT_LATITUDE, DEFAULT_LONGITUDE);
-        mapRef.current = new window.kakao.maps.Map(mapContainer.current, { center, level: 3 });
-        markerRef.current = new window.kakao.maps.Marker({ position: center });
+        const initCenter = new window.kakao.maps.LatLng(latitude, longitude);
+        mapRef.current = new window.kakao.maps.Map(mapContainer.current, { center: initCenter, level: 3 });
+        markerRef.current = new window.kakao.maps.Marker({ position: initCenter });
         markerRef.current.setMap(mapRef.current);
 
         if (navigator.geolocation && !isEditMode) {
@@ -148,7 +148,7 @@ const MatchCreateForm: React.FC = () => {
             updateAddressFromCoords(lat, lng);
         });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isLoading]);
 
     // 위도/경도 변경 시 지도 마커·센터 동기화
     useEffect(() => {
