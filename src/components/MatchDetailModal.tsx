@@ -12,7 +12,7 @@ import {
     type ApplicationDecisionStatus,
 } from '../utils/matchApi';
 import { useAuth } from '../context/useAuth';
-import { POSITION_LABEL, type PositionSlot } from '../types/match';
+import { POSITION_LABEL, type Position, type PositionSlot } from '../types/match';
 
 interface MatchDetailModalProps {
     matchId: number;
@@ -103,6 +103,8 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
     const [isApplicationsLoading, setIsApplicationsLoading] = useState(false);
     const [processingApplicationId, setProcessingApplicationId] = useState<number | null>(null);
     const [canManageApplications, setCanManageApplications] = useState(false);
+    const [showPositionPicker, setShowPositionPicker] = useState(false);
+    const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
     const { token, user } = useAuth();
     const isAuthorByPayload = Boolean(
@@ -273,7 +275,7 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         navigate('/login');
     };
 
-    const handleJoin = async () => {
+    const handleJoin = () => {
         if (!match || isApplying || myApplication.applied || isJoinBlockedByMatchState) {
             return;
         }
@@ -283,15 +285,32 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
             return;
         }
 
+        if (match.slots && match.slots.length > 0) {
+            setSelectedPosition(null);
+            setShowPositionPicker(true);
+            return;
+        }
+
+        void handleConfirmJoin(null);
+    };
+
+    const handleConfirmJoin = async (position: Position | null) => {
+        if (!match || isApplying) {
+            return;
+        }
+
         if (!window.confirm(`'${match.title}' 경기에 신청하시겠습니까?`)) {
             return;
         }
 
+        setShowPositionPicker(false);
         setIsApplying(true);
 
         try {
             const response = await apiFetch(buildApiUrl(`/api/matches/${matchId}/apply`), {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(position ? { position } : {}),
             });
             const payload = await response.json().catch(() => null);
 
@@ -511,6 +530,48 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
                                         </button>
                                         <p style={styles.applicationHint}>비로그인 상태에서는 로그인 후 신청할 수 있습니다.</p>
                                     </>
+                                ) : showPositionPicker && match.slots && match.slots.length > 0 ? (
+                                    <div style={styles.positionPicker}>
+                                        <p style={styles.positionPickerTitle}>신청할 포지션을 선택하세요</p>
+                                        <div style={styles.positionPickerGrid}>
+                                            {match.slots.map(slot => (
+                                                <button
+                                                    key={slot.position}
+                                                    disabled={slot.available === 0}
+                                                    onClick={() => setSelectedPosition(slot.position)}
+                                                    style={{
+                                                        ...styles.positionPickerBtn,
+                                                        ...(slot.available === 0 ? styles.positionPickerBtnDisabled : {}),
+                                                        ...(selectedPosition === slot.position ? styles.positionPickerBtnSelected : {}),
+                                                    }}
+                                                >
+                                                    <span>{POSITION_LABEL[slot.position]}</span>
+                                                    <span style={styles.positionPickerSlotInfo}>
+                                                        {slot.available > 0 ? `${slot.available}자리` : '마감'}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div style={styles.pickerActions}>
+                                            <button
+                                                style={styles.pickerCancelBtn}
+                                                onClick={() => setShowPositionPicker(false)}
+                                            >
+                                                취소
+                                            </button>
+                                            <button
+                                                style={{
+                                                    ...styles.pickerConfirmBtn,
+                                                    opacity: selectedPosition ? 1 : 0.5,
+                                                    cursor: selectedPosition && !isApplying ? 'pointer' : 'not-allowed',
+                                                }}
+                                                disabled={!selectedPosition || isApplying}
+                                                onClick={() => selectedPosition && void handleConfirmJoin(selectedPosition)}
+                                            >
+                                                {isApplying ? '신청 중...' : '신청하기'}
+                                            </button>
+                                        </div>
+                                    </div>
                                 ) : (
                                     <>
                                         <button
@@ -804,6 +865,78 @@ const styles: { [key: string]: React.CSSProperties } = {
         fontSize: '11px',
         fontWeight: 700,
         color: '#9ca3af',
+    },
+    positionPicker: {
+        borderTop: '1px solid #e5e7eb',
+        paddingTop: '16px',
+    },
+    positionPickerTitle: {
+        margin: '0 0 12px 0',
+        fontSize: '14px',
+        fontWeight: 600,
+        color: '#0f172a',
+    },
+    positionPickerGrid: {
+        display: 'flex',
+        flexWrap: 'wrap' as const,
+        gap: '8px',
+        marginBottom: '16px',
+    },
+    positionPickerBtn: {
+        display: 'flex',
+        flexDirection: 'column' as const,
+        alignItems: 'center',
+        gap: '2px',
+        padding: '8px 14px',
+        borderRadius: '10px',
+        border: '1.5px solid #cbd5e1',
+        backgroundColor: '#ffffff',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: 600,
+        color: '#334155',
+        transition: 'all 0.15s',
+    },
+    positionPickerBtnDisabled: {
+        backgroundColor: '#f1f5f9',
+        borderColor: '#e2e8f0',
+        color: '#94a3b8',
+        cursor: 'not-allowed',
+    },
+    positionPickerBtnSelected: {
+        backgroundColor: '#f0fdf4',
+        borderColor: '#10b981',
+        color: '#065f46',
+    },
+    positionPickerSlotInfo: {
+        fontSize: '11px',
+        fontWeight: 500,
+        color: '#64748b',
+    },
+    pickerActions: {
+        display: 'flex',
+        gap: '8px',
+    },
+    pickerCancelBtn: {
+        flex: 1,
+        padding: '12px',
+        border: '1px solid #cbd5e1',
+        borderRadius: '10px',
+        backgroundColor: '#ffffff',
+        color: '#334155',
+        fontSize: '15px',
+        fontWeight: 600,
+        cursor: 'pointer',
+    },
+    pickerConfirmBtn: {
+        flex: 2,
+        padding: '12px',
+        border: 'none',
+        borderRadius: '10px',
+        backgroundColor: '#10b981',
+        color: '#ffffff',
+        fontSize: '15px',
+        fontWeight: 700,
     },
 };
 
