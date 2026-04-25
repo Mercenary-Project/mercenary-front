@@ -12,6 +12,7 @@ import {
     type ApplicationDecisionStatus,
 } from '../utils/matchApi';
 import { useAuth } from '../context/useAuth';
+import { POSITION_LABEL, type PositionSlot } from '../types/match';
 
 interface MatchDetailModalProps {
     matchId: number;
@@ -32,6 +33,8 @@ interface MatchDetailDto {
     writerName?: string;
     writerNickname?: string;
     status?: string;
+    slots?: PositionSlot[];
+    isFullyBooked?: boolean;
 }
 
 type MyApplicationStatus = {
@@ -110,7 +113,9 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
         )
     );
     const isPastDue = match ? isPastMatch(match.matchDate) : false;
-    const isFull = match ? isMatchFull(match.currentPlayerCount, match.maxPlayerCount) : false;
+    const isFull = match
+        ? (match.isFullyBooked ?? (match.slots ? match.slots.every(s => s.available === 0) : isMatchFull(match.currentPlayerCount, match.maxPlayerCount)))
+        : false;
     const isClosed = match?.status === 'CLOSED';
     const isJoinBlockedByMatchState = isClosed || isPastDue || isFull;
     const shouldShowManagementUi = isAuthorByPayload || canManageApplications;
@@ -389,12 +394,27 @@ const MatchDetailModal: React.FC<MatchDetailModalProps> = ({ matchId, onClose, o
                                 </div>
                             </div>
 
-                            <div style={styles.infoItem}>
-                                <span style={styles.icon}>인원</span>
-                                <span>
-                                    현재 <span style={styles.highlightText}>{match.currentPlayerCount}</span>명 / 총 {match.maxPlayerCount}명
-                                </span>
-                            </div>
+                            {match.slots && match.slots.length > 0 && (
+                                <div style={styles.infoItem}>
+                                    <span style={{ ...styles.icon, alignSelf: 'flex-start' }}>포지션</span>
+                                    <div style={styles.slotGrid}>
+                                        {match.slots.map(slot => (
+                                            <span
+                                                key={slot.position}
+                                                style={slot.available > 0 ? styles.slotOpen : styles.slotClosed}
+                                            >
+                                                {POSITION_LABEL[slot.position]}
+                                                {' '}
+                                                <span style={styles.slotCount}>{slot.filled}/{slot.required}명</span>
+                                                {' '}
+                                                <span style={slot.available > 0 ? styles.slotStatusOpen : styles.slotStatusClosed}>
+                                                    {slot.available > 0 ? '모집중' : '마감'}
+                                                </span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {match.writerName || match.writerNickname ? (
                                 <div style={styles.infoItem}>
@@ -744,6 +764,46 @@ const styles: { [key: string]: React.CSSProperties } = {
         padding: '40px',
         textAlign: 'center',
         color: '#888',
+    },
+    slotGrid: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '6px',
+    },
+    slotOpen: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '4px 10px',
+        borderRadius: '20px',
+        backgroundColor: '#f0fdf4',
+        border: '1px solid #bbf7d0',
+        fontSize: '13px',
+        color: '#065f46',
+    },
+    slotClosed: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '4px 10px',
+        borderRadius: '20px',
+        backgroundColor: '#f1f3f5',
+        border: '1px solid #dee2e6',
+        fontSize: '13px',
+        color: '#868e96',
+    },
+    slotCount: {
+        fontWeight: 600,
+    },
+    slotStatusOpen: {
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#059669',
+    },
+    slotStatusClosed: {
+        fontSize: '11px',
+        fontWeight: 700,
+        color: '#9ca3af',
     },
 };
 
