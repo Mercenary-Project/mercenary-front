@@ -8,17 +8,20 @@ import { extractResponseData, extractResponseMessage, formatDateTimeLocalValue, 
 import { buildApiUrl } from '../utils/api';
 import { apiFetch } from '../utils/apiFetch';
 import { useAuth } from '../context/useAuth';
-
+import { POSITION_LABEL, type Position, type PositionSlot } from '../types/match';
 
 type EditableMatchDetail = MatchSummary & {
     fullAddress?: string;
     district?: string;
     latitude?: number;
     longitude?: number;
+    slots?: PositionSlot[];
 };
 
 const DEFAULT_LATITUDE = 37.5665;
 const DEFAULT_LONGITUDE = 126.978;
+
+const POSITIONS = Object.keys(POSITION_LABEL) as Position[];
 
 const inferDistrict = (district?: string, fullAddress?: string) => {
     if (district?.trim()) return district.trim();
@@ -27,38 +30,31 @@ const inferDistrict = (district?: string, fullAddress?: string) => {
     return source.split(' ')[1] ?? source;
 };
 
-const matchSchema = z
-    .object({
-        title: z
-            .string()
-            .min(1, '제목을 입력해 주세요.')
-            .max(100, '제목은 100자 이하로 입력해 주세요.'),
-        content: z
-            .string()
-            .max(500, '내용은 500자 이하로 입력해 주세요.')
-            .optional(),
-        matchDate: z
-            .string()
-            .min(1, '일시를 선택해 주세요.')
-            .refine((v) => new Date(v) > new Date(), '현재 시간 이후의 일시를 선택해 주세요.'),
-        currentPlayerCount: z
-            .number({ error: '숫자를 입력해 주세요.' })
-            .min(1, '현재 인원은 1명 이상이어야 합니다.')
-            .max(30, '최대 30명까지 설정 가능합니다.'),
-        maxPlayerCount: z
-            .number({ error: '숫자를 입력해 주세요.' })
-            .min(2, '모집 정원은 2명 이상이어야 합니다.')
-            .max(30, '최대 30명까지 설정 가능합니다.'),
-        placeName: z.string().min(1, '지도에서 장소를 선택해 주세요.'),
-        latitude: z.number(),
-        longitude: z.number(),
-        fullAddress: z.string().optional(),
-        district: z.string().optional(),
-    })
-    .refine((data) => data.currentPlayerCount <= data.maxPlayerCount, {
-        message: '현재 인원은 모집 정원보다 클 수 없습니다.',
-        path: ['currentPlayerCount'],
-    });
+const positionSlotSchema = z.object({
+    position: z.enum(['GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CAM', 'LW', 'RW', 'ST']),
+    required: z.number().min(1),
+});
+
+const matchSchema = z.object({
+    title: z
+        .string()
+        .min(1, '제목을 입력해 주세요.')
+        .max(100, '제목은 100자 이하로 입력해 주세요.'),
+    content: z
+        .string()
+        .max(500, '내용은 500자 이하로 입력해 주세요.')
+        .optional(),
+    matchDate: z
+        .string()
+        .min(1, '일시를 선택해 주세요.')
+        .refine((v) => new Date(v) > new Date(), '현재 시간 이후의 일시를 선택해 주세요.'),
+    placeName: z.string().min(1, '지도에서 장소를 선택해 주세요.'),
+    latitude: z.number(),
+    longitude: z.number(),
+    fullAddress: z.string().optional(),
+    district: z.string().optional(),
+    slots: z.array(positionSlotSchema).min(1, '포지션을 1개 이상 추가하세요.'),
+});
 
 type MatchFormValues = z.infer<typeof matchSchema>;
 
@@ -75,6 +71,8 @@ const MatchCreateForm: React.FC = () => {
 
     const [keyword, setKeyword] = useState('');
     const [isLoading, setIsLoading] = useState(isEditMode);
+    const [draftPosition, setDraftPosition] = useState<Position>('GK');
+    const [draftRequired, setDraftRequired] = useState(1);
 
     const {
         register,
@@ -90,8 +88,7 @@ const MatchCreateForm: React.FC = () => {
             title: '',
             content: '',
             matchDate: '',
-            currentPlayerCount: 1,
-            maxPlayerCount: 5,
+            slots: [],
             placeName: '',
             latitude: DEFAULT_LATITUDE,
             longitude: DEFAULT_LONGITUDE,
@@ -102,6 +99,7 @@ const MatchCreateForm: React.FC = () => {
 
     const latitude = watch('latitude');
     const longitude = watch('longitude');
+    const slots = watch('slots');
 
     const updateAddressFromCoords = useCallback(
         (lat: number, lng: number) => {
@@ -119,7 +117,6 @@ const MatchCreateForm: React.FC = () => {
         [setValue],
     );
 
-    // 지도 초기화 (isLoading 해제 후 mapContainer가 DOM에 마운트된 뒤 실행)
     useEffect(() => {
         if (!window.kakao?.maps || !mapContainer.current || mapRef.current) return;
 
@@ -150,7 +147,6 @@ const MatchCreateForm: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoading]);
 
-    // 위도/경도 변경 시 지도 마커·센터 동기화
     useEffect(() => {
         if (!mapRef.current || !markerRef.current || !window.kakao?.maps) return;
         const center = new window.kakao.maps.LatLng(latitude, longitude);
@@ -158,7 +154,6 @@ const MatchCreateForm: React.FC = () => {
         markerRef.current.setPosition(center);
     }, [latitude, longitude]);
 
-    // 수정 모드: 기존 매치 데이터 로드
     useEffect(() => {
         if (!isEditMode || !numericMatchId) return;
 
@@ -182,11 +177,9 @@ const MatchCreateForm: React.FC = () => {
                     latitude: data.latitude ?? DEFAULT_LATITUDE,
                     longitude: data.longitude ?? DEFAULT_LONGITUDE,
                     matchDate: formatDateTimeLocalValue(data.matchDate),
-                    currentPlayerCount: data.currentPlayerCount ?? 1,
-                    maxPlayerCount: data.maxPlayerCount ?? 5,
+                    slots: (data.slots ?? []).map((s) => ({ position: s.position, required: s.required })),
                 });
             } catch (error) {
-                console.error(error);
                 alert(error instanceof Error ? error.message : '매치 정보를 불러오는 중 오류가 발생했습니다.');
                 navigate('/mypage', { replace: true });
             } finally {
@@ -196,6 +189,18 @@ const MatchCreateForm: React.FC = () => {
 
         void fetchMatchDetail();
     }, [isEditMode, navigate, numericMatchId, reset]);
+
+    const handleAddSlot = () => {
+        if (slots.some((s) => s.position === draftPosition)) {
+            alert(`${POSITION_LABEL[draftPosition]} 포지션은 이미 추가되었습니다.`);
+            return;
+        }
+        setValue('slots', [...slots, { position: draftPosition, required: draftRequired }], { shouldValidate: true });
+    };
+
+    const handleRemoveSlot = (position: Position) => {
+        setValue('slots', slots.filter((s) => s.position !== position), { shouldValidate: true });
+    };
 
     const handleSearch = () => {
         if (!keyword.trim()) {
@@ -233,13 +238,12 @@ const MatchCreateForm: React.FC = () => {
             title: data.title.trim(),
             content: data.content?.trim() ?? '',
             matchDate: data.matchDate,
-            currentPlayerCount: data.currentPlayerCount,
-            maxPlayerCount: data.maxPlayerCount,
             placeName: data.placeName.trim(),
             fullAddress: data.fullAddress?.trim() ?? '',
             district: data.district?.trim() ?? '',
             latitude: data.latitude,
             longitude: data.longitude,
+            slots: data.slots.map((s) => ({ position: s.position, required: s.required })),
         };
 
         try {
@@ -261,7 +265,6 @@ const MatchCreateForm: React.FC = () => {
             alert(isEditMode ? '매치가 성공적으로 수정되었습니다.' : '매치가 성공적으로 등록되었습니다.');
             navigate(isEditMode ? '/mypage' : '/');
         } catch (error) {
-            console.error(error);
             alert(error instanceof Error ? error.message : '요청 처리 중 오류가 발생했습니다.');
         }
     };
@@ -315,31 +318,59 @@ const MatchCreateForm: React.FC = () => {
                         {errors.matchDate && <p className="mc-field-error">{errors.matchDate.message}</p>}
                     </div>
 
-                    <div className="mc-row">
-                        <div style={{ flex: 1 }} className="mc-input-group">
-                            <label className="mc-label">현재 인원</label>
+                    <div className="mc-input-group">
+                        <label className="mc-label">
+                            포지션 모집 <span className="mc-required">*</span>
+                        </label>
+                        <div className="mc-slot-builder">
+                            <select
+                                className="mc-input mc-slot-select"
+                                value={draftPosition}
+                                onChange={(e) => setDraftPosition(e.target.value as Position)}
+                            >
+                                {POSITIONS.map((pos) => (
+                                    <option key={pos} value={pos}>
+                                        {pos} · {POSITION_LABEL[pos]}
+                                    </option>
+                                ))}
+                            </select>
                             <input
-                                {...register('currentPlayerCount', { valueAsNumber: true })}
                                 type="number"
-                                className={`mc-input${errors.currentPlayerCount ? ' mc-input--error' : ''}`}
+                                className="mc-input mc-slot-count"
+                                value={draftRequired}
                                 min={1}
+                                max={20}
+                                onChange={(e) => setDraftRequired(Math.max(1, Number(e.target.value)))}
                             />
-                            {errors.currentPlayerCount && (
-                                <p className="mc-field-error">{errors.currentPlayerCount.message}</p>
-                            )}
+                            <span className="mc-slot-unit">명</span>
+                            <button
+                                type="button"
+                                className="mc-search-btn"
+                                onClick={handleAddSlot}
+                            >
+                                추가
+                            </button>
                         </div>
-                        <div style={{ flex: 1 }} className="mc-input-group">
-                            <label className="mc-label">모집 정원</label>
-                            <input
-                                {...register('maxPlayerCount', { valueAsNumber: true })}
-                                type="number"
-                                className={`mc-input${errors.maxPlayerCount ? ' mc-input--error' : ''}`}
-                                min={2}
-                            />
-                            {errors.maxPlayerCount && (
-                                <p className="mc-field-error">{errors.maxPlayerCount.message}</p>
-                            )}
-                        </div>
+                        {slots.length > 0 && (
+                            <div className="mc-slot-tags">
+                                {slots.map((s) => (
+                                    <span key={s.position} className="mc-slot-tag">
+                                        <span className="mc-slot-tag-pos">{s.position}</span>
+                                        <span className="mc-slot-tag-label">{POSITION_LABEL[s.position]}</span>
+                                        <span className="mc-slot-tag-count">{s.required}명</span>
+                                        <button
+                                            type="button"
+                                            className="mc-slot-tag-remove"
+                                            onClick={() => handleRemoveSlot(s.position)}
+                                            aria-label={`${POSITION_LABEL[s.position]} 제거`}
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        {errors.slots && <p className="mc-field-error">{errors.slots.message}</p>}
                     </div>
 
                     <div className="mc-input-group">

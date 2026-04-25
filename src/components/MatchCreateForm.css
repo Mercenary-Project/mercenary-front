@@ -199,6 +199,78 @@
     font-weight: 500;
 }
 
+.mc-slot-builder {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.mc-slot-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.mc-slot-count {
+    width: 64px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.mc-slot-unit {
+    font-size: 13px;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.mc-slot-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.mc-slot-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 20px;
+    padding: 4px 10px 4px 12px;
+    font-size: 13px;
+    color: #065f46;
+}
+
+.mc-slot-tag-pos {
+    font-weight: 700;
+}
+
+.mc-slot-tag-label {
+    color: #047857;
+}
+
+.mc-slot-tag-count {
+    font-weight: 600;
+    margin-left: 2px;
+}
+
+.mc-slot-tag-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6b7280;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 0 0 4px;
+    display: flex;
+    align-items: center;
+}
+
+.mc-slot-tag-remove:hover {
+    color: #ef4444;
+}
+
 @media (max-width: 768px) {
     .mc-header {
         width: 100%;
