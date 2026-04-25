@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
+import type { PositionSlot } from '../types/match';
+
 export interface Match {
     matchId: number;
     placeName: string;
@@ -8,8 +10,8 @@ export interface Match {
     title?: string;
     matchDate?: string;
     distance?: number;
-    currentPlayerCount?: number;
-    maxPlayerCount?: number;
+    slots?: PositionSlot[];
+    isFullyBooked?: boolean;
 }
 
 interface MatchMapProps {

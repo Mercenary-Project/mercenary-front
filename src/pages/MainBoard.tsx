@@ -7,6 +7,7 @@ import { useAuth } from '../context/useAuth';
 import { buildApiUrl } from '../utils/api';
 import { apiFetch } from '../utils/apiFetch';
 import { isPastMatch } from '../utils/matchApi';
+import { POSITION_LABEL, type PositionSlot } from '../types/match';
 import './MainBoard.css';
 
 
@@ -16,12 +17,12 @@ interface MatchResponseDto {
     title: string;
     content?: string;
     placeName?: string;
-    currentPlayerCount?: number;
-    maxPlayerCount?: number;
     latitude: number;
     longitude: number;
     matchDate: string;
     distance?: number;
+    slots?: PositionSlot[];
+    isFullyBooked?: boolean;
 }
 
 const MainBoard: React.FC = () => {
@@ -72,8 +73,8 @@ const MainBoard: React.FC = () => {
                     longitude: item.longitude,
                     matchDate: item.matchDate,
                     distance: item.distance,
-                    currentPlayerCount: item.currentPlayerCount,
-                    maxPlayerCount: item.maxPlayerCount,
+                    slots: item.slots,
+                    isFullyBooked: item.isFullyBooked,
                 }));
 
                 setMatches(parsedData);
@@ -253,10 +254,21 @@ const MainBoard: React.FC = () => {
                                     <div className="main-board__match-info">
                                         <h4 className="main-board__match-title">{match.title || match.placeName}</h4>
                                         <p className="main-board__match-place">{match.placeName}</p>
+                                        {match.slots && match.slots.length > 0 && (
+                                            <div className="main-board__match-slots">
+                                                {match.slots
+                                                    .filter(s => s.available > 0)
+                                                    .map(s => (
+                                                        <span key={s.position} className="main-board__slot-tag">
+                                                            {POSITION_LABEL[s.position]}
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                        )}
                                     </div>
-                                    <span className="main-board__match-count">
-                                        {match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명
-                                    </span>
+                                    {match.isFullyBooked ? (
+                                        <span className="main-board__match-full-badge">모집완료</span>
+                                    ) : null}
                                 </div>
                             ))
                         )}

@@ -216,15 +216,34 @@
     color: #64748b;
 }
 
-.main-board__match-count {
-    flex-shrink: 0;
-    font-size: 14px;
+.main-board__match-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.main-board__slot-tag {
+    display: inline-block;
+    font-size: 11px;
     font-weight: 700;
-    color: #10b981;
+    color: #047857;
     background: #f0fdf4;
     border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    padding: 2px 7px;
+    white-space: nowrap;
+}
+
+.main-board__match-full-badge {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
     border-radius: 10px;
-    padding: 6px 12px;
+    padding: 5px 10px;
     white-space: nowrap;
 }
 
