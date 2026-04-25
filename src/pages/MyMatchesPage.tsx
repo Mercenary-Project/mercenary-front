@@ -296,7 +296,11 @@ const MyMatchesPage: React.FC = () => {
                                     <div style={styles.matchSubText}>
                                         <span>{match.placeName || '장소 미정'}</span>
                                         <span>{formatDateTime(match.matchDate)}</span>
-                                        <span>{match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명</span>
+                                        {match.isFullyBooked
+                                            ? <span>모집완료</span>
+                                            : match.slots && match.slots.some(s => s.available > 0)
+                                                ? <span>{match.slots.reduce((n, s) => n + s.available, 0)}자리 모집중</span>
+                                                : null}
                                     </div>
                                 </div>
                                 <div style={styles.matchActionGroup}>
@@ -426,7 +430,11 @@ const MyMatchesPage: React.FC = () => {
                                         <span>{match.placeName || '장소 미정'}</span>
                                         <span>{formatDateTime(match.matchDate)}</span>
                                         <span>작성자 {match.writerName || '-'}</span>
-                                        <span>{match.currentPlayerCount ?? 0}/{match.maxPlayerCount ?? 0}명</span>
+                                        {match.isFullyBooked
+                                            ? <span>모집완료</span>
+                                            : match.slots && match.slots.some(s => s.available > 0)
+                                                ? <span>{match.slots.reduce((n, s) => n + s.available, 0)}자리 모집중</span>
+                                                : null}
                                     </div>
                                 </div>
                                 <span style={canCancel ? styles.badgeReady : styles.badgeDone}>

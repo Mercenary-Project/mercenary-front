@@ -1,3 +1,7 @@
+import { buildApiUrl } from './api';
+import { apiFetch } from './apiFetch';
+import type { Position, PositionSlot } from '../types/match';
+
 export type ApplicationDecisionStatus = 'READY' | 'APPROVED' | 'REJECTED' | 'CANCELED';
 
 export interface ApiEnvelope<T> {
@@ -26,8 +30,8 @@ export interface MatchSummary {
     latitude?: number;
     longitude?: number;
     matchDate: string;
-    currentPlayerCount?: number;
-    maxPlayerCount?: number;
+    slots?: PositionSlot[];
+    isFullyBooked?: boolean;
     writerId?: number;
     writerName?: string;
     writerNickname?: string;
@@ -41,8 +45,8 @@ export interface AppliedMatchSummary {
     matchDate: string;
     placeName?: string;
     status: ApplicationDecisionStatus;
-    currentPlayerCount?: number;
-    maxPlayerCount?: number;
+    slots?: PositionSlot[];
+    isFullyBooked?: boolean;
     writerName?: string;
 }
 
@@ -120,6 +124,19 @@ export const isMatchFull = (currentPlayerCount?: number, maxPlayerCount?: number
     }
 
     return currentPlayerCount >= maxPlayerCount;
+};
+
+export const applyToMatch = async (matchId: number, position: Position): Promise<void> => {
+    const response = await apiFetch(buildApiUrl(`/api/applications/${matchId}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position }),
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(extractResponseMessage(payload, '참가 신청에 실패했습니다.'));
+    }
 };
 
 export const formatReviewStatus = (status: ApplicationDecisionStatus) => {
