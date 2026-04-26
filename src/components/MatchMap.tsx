@@ -12,6 +12,7 @@ export interface Match {
     distance?: number;
     slots?: PositionSlot[];
     isFullyBooked?: boolean;
+    status?: string;
 }
 
 interface MatchMapProps {

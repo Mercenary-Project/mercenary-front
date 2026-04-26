@@ -247,6 +247,30 @@
     white-space: nowrap;
 }
 
+.main-board__match-closed-badge {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    background: #ef4444;
+    border: 1px solid #fca5a5;
+    border-radius: 10px;
+    padding: 5px 10px;
+    white-space: nowrap;
+}
+
+.main-board__match-remain-badge {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #047857;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 5px 10px;
+    white-space: nowrap;
+}
+
 .main-board__empty {
     padding: 24px;
     text-align: center;

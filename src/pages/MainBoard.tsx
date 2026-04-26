@@ -242,35 +242,42 @@ const MainBoard: React.FC = () => {
                                 {selectedDate ? '선택한 날짜에 등록된 경기가 없습니다.' : '주변에 등록된 경기가 없습니다.'}
                             </div>
                         ) : (
-                            displayedMatches.map((match) => (
-                                <div
-                                    key={match.matchId}
-                                    className="main-board__match-card"
-                                    onClick={() => setSelectedMatchId(match.matchId || 0)}
-                                >
-                                    <span className="main-board__match-time">
-                                        {formatMatchTime(match.matchDate)}
-                                    </span>
-                                    <div className="main-board__match-info">
-                                        <h4 className="main-board__match-title">{match.title || match.placeName}</h4>
-                                        <p className="main-board__match-place">{match.placeName}</p>
-                                        {match.slots && match.slots.length > 0 && (
-                                            <div className="main-board__match-slots">
-                                                {match.slots
-                                                    .filter(s => s.available > 0)
-                                                    .map(s => (
-                                                        <span key={s.position} className="main-board__slot-tag">
-                                                            {POSITION_LABEL[s.position]}
-                                                        </span>
-                                                    ))}
-                                            </div>
-                                        )}
+                            displayedMatches.map((match) => {
+                                const totalAvailable = match.slots?.reduce((sum, s) => sum + s.available, 0) ?? 0;
+                                const isFull = match.isFullyBooked || (match.slots ? match.slots.every(s => s.available === 0) : false);
+                                const isClosed = match.status === 'CLOSED';
+                                return (
+                                    <div
+                                        key={match.matchId}
+                                        className="main-board__match-card"
+                                        onClick={() => setSelectedMatchId(match.matchId || 0)}
+                                    >
+                                        <span className="main-board__match-time">
+                                            {formatMatchTime(match.matchDate)}
+                                        </span>
+                                        <div className="main-board__match-info">
+                                            <h4 className="main-board__match-title">{match.title || match.placeName}</h4>
+                                            <p className="main-board__match-place">{match.placeName}</p>
+                                            {match.slots && match.slots.length > 0 && (
+                                                <div className="main-board__match-slots">
+                                                    {match.slots
+                                                        .filter(s => s.available > 0)
+                                                        .map(s => (
+                                                            <span key={s.position} className="main-board__slot-tag">
+                                                                {POSITION_LABEL[s.position]}
+                                                            </span>
+                                                        ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {(isFull || isClosed) ? (
+                                            <span className="main-board__match-closed-badge">마감</span>
+                                        ) : match.slots && match.slots.length > 0 ? (
+                                            <span className="main-board__match-remain-badge">잔여 {totalAvailable}명</span>
+                                        ) : null}
                                     </div>
-                                    {match.isFullyBooked ? (
-                                        <span className="main-board__match-full-badge">모집완료</span>
-                                    ) : null}
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </section>
